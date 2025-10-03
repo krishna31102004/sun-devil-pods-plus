@@ -1,8 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SpacePicker, { Space } from '../components/SpacePicker';
 import BelongingPulse from '../components/BelongingPulse';
 import BadgeAvatar from '../components/BadgeAvatar';
+import { getRole, Role } from '../lib/roles';
+import { adjustPoints, getPoints } from '../lib/points';
 
 type User = {
   id: string;
@@ -21,7 +23,7 @@ type Pod = {
   interests: string[];
   tags: string[];
   memberIds: string[];
-  captainId: string;
+  captainId?: string | null;
   points: number;
   level: number;
   vibe: number;
@@ -95,6 +97,40 @@ const getEffectiveAvailability = (space: Space, overrides: Record<string, boolea
   return typeof space.available === 'boolean' ? space.available : true;
 };
 
+const clampWeek = (value: number) => Math.min(14, Math.max(1, value));
+
+const semesterAnchor = () => {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  return new Date(currentYear, 7, 19); // August is month 7 (zero-indexed)
+};
+
+const deriveWeekFromAnchor = () => {
+  const anchor = semesterAnchor();
+  const now = new Date();
+  const diffMs = now.getTime() - anchor.getTime();
+  const weeks = Math.floor(diffMs / (1000 * 60 * 60 * 24 * 7));
+  return clampWeek(1 + weeks);
+};
+
+const readCurrentWeek = () => {
+  if (typeof window === 'undefined') return 1;
+  const stored = localStorage.getItem('currentWeek');
+  if (stored) {
+    const parsed = parseInt(stored, 10);
+    if (!Number.isNaN(parsed)) {
+      return clampWeek(parsed);
+    }
+  }
+  const computed = deriveWeekFromAnchor();
+  try {
+    localStorage.setItem('currentWeek', computed.toString());
+  } catch (error) {
+    console.error('Unable to persist derived week', error);
+  }
+  return computed;
+};
+
 const PodDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [bundle, setBundle] = useState<DataBundle>(defaultBundle);
@@ -103,12 +139,23 @@ const PodDashboard: React.FC = () => {
   const [pod, setPod] = useState<Pod | null>(null);
   const [podMembers, setPodMembers] = useState<User[]>([]);
   const [quest, setQuest] = useState<Quest | null>(null);
-  const [currentWeek, setCurrentWeek] = useState<number>(1);
-  const [points, setPoints] = useState<number>(() => {
-    if (typeof window === 'undefined') return 0;
-    const stored = localStorage.getItem('points');
-    return stored ? parseInt(stored, 10) || 0 : 0;
+  const [currentWeek, setCurrentWeek] = useState<number>(() => readCurrentWeek());
+  const [role, setRoleState] = useState<Role>(() => (typeof window === 'undefined' ? 'student' : getRole()));
+  const [currentUserId, setCurrentUserId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem('currentUserId');
   });
+  const [currentUserName, setCurrentUserName] = useState<string>(() => {
+    if (typeof window === 'undefined') return 'Friend';
+    return localStorage.getItem('currentUserName') || 'Friend';
+  });
+  const [points, setPointsState] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0;
+    const uid = localStorage.getItem('currentUserId');
+    return getPoints(uid);
+  });
+  const pointsAnimationStart = useRef(points);
+  const [displayedPoints, setDisplayedPoints] = useState<number>(points);
   const [unlockedBadges, setUnlockedBadges] = useState<Badge[]>([]);
   const [questCompleted, setQuestCompleted] = useState<boolean>(false);
   const [selectedSpace, setSelectedSpace] = useState<Space | null>(null);
@@ -130,24 +177,22 @@ const PodDashboard: React.FC = () => {
   const [showPulseModal, setShowPulseModal] = useState<boolean>(false);
   const [lastBelongingScore, setLastBelongingScore] = useState<number | null>(null);
   const [belongingDelta, setBelongingDelta] = useState<number | null>(null);
-  const [currentUserId, setCurrentUserId] = useState<string>('me');
-  const [currentUserName, setCurrentUserName] = useState<string>('Friend');
-  const [isCaptain, setIsCaptain] = useState<boolean>(false);
   const [isCheckedInThisWeek, setIsCheckedInThisWeek] = useState<boolean>(false);
 
+  const isCaptain = role === 'captain';
+  const isCaptainCandidate = role === 'captain-candidate';
+  const currentUserKey = currentUserId || 'guest';
+
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     try {
-      const storedWeek = localStorage.getItem('currentWeek');
-      if (storedWeek) {
-        const parsed = parseInt(storedWeek, 10);
-        if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= 4) {
-          setCurrentWeek(parsed);
-        }
-      }
+      const resolvedWeek = readCurrentWeek();
+      setCurrentWeek(resolvedWeek);
       const userId = localStorage.getItem('currentUserId');
       const userName = localStorage.getItem('currentUserName');
-      if (userId) setCurrentUserId(userId);
-      if (userName) setCurrentUserName(userName);
+      setCurrentUserId(userId);
+      setCurrentUserName(userName || 'Friend');
+      setRoleState(getRole());
       const storedSignup = localStorage.getItem('signupData');
       if (!storedSignup) {
         navigate('/', { replace: true });
@@ -192,6 +237,65 @@ const PodDashboard: React.FC = () => {
     };
     loadData();
   }, []);
+
+  useEffect(() => {
+    const handleRole = () => setRoleState(getRole());
+    const syncSession = () => {
+      const uid = localStorage.getItem('currentUserId');
+      const displayName = localStorage.getItem('currentUserName');
+      setCurrentUserId(uid);
+      setCurrentUserName(displayName || 'Friend');
+      setPointsState(getPoints(uid));
+    };
+    const handlePoints = (event: Event) => {
+      const detail = (event as CustomEvent<number | undefined>).detail;
+      if (typeof detail === 'number') {
+        setPointsState(detail);
+      } else {
+        const uid = localStorage.getItem('currentUserId');
+        setPointsState(getPoints(uid));
+      }
+    };
+
+    window.addEventListener('pods:role-updated', handleRole);
+    window.addEventListener('pods:session-updated', syncSession);
+    window.addEventListener('pods:points-updated', handlePoints as EventListener);
+    window.addEventListener('storage', syncSession);
+    return () => {
+      window.removeEventListener('pods:role-updated', handleRole);
+      window.removeEventListener('pods:session-updated', syncSession);
+      window.removeEventListener('pods:points-updated', handlePoints as EventListener);
+      window.removeEventListener('storage', syncSession);
+    };
+  }, []);
+
+  useEffect(() => {
+    setPointsState(getPoints(currentUserId));
+  }, [currentUserId]);
+
+  useEffect(() => {
+    const initial = pointsAnimationStart.current;
+    const target = points;
+    if (initial === target) {
+      setDisplayedPoints(target);
+      return;
+    }
+    let raf = 0;
+    let start: number | null = null;
+    const duration = 450;
+    const tick = (timestamp: number) => {
+      if (start === null) start = timestamp;
+      const progress = Math.min((timestamp - start) / duration, 1);
+      const value = Math.round(initial + (target - initial) * progress);
+      setDisplayedPoints(value);
+      if (progress < 1) {
+        raf = requestAnimationFrame(tick);
+      }
+    };
+    raf = requestAnimationFrame(tick);
+    pointsAnimationStart.current = target;
+    return () => cancelAnimationFrame(raf);
+  }, [points]);
 
   useEffect(() => {
     if (bundle.badges.length === 0) return;
@@ -254,16 +358,10 @@ const PodDashboard: React.FC = () => {
     setQuest(activeQuest);
   }, [bundle.quests, currentWeek]);
 
-  useEffect(() => {
-    if (!pod) return;
-    const captain = pod.captainId === currentUserId;
-    setIsCaptain(captain);
-  }, [pod, currentUserId]);
-
-  const checkinKey = useMemo(() => (pod ? `checkin:${pod.id}:${currentWeek}:${currentUserId}` : null), [pod, currentWeek, currentUserId]);
+  const checkinKey = useMemo(() => (pod ? `checkin:${pod.id}:${currentWeek}:${currentUserKey}` : null), [pod, currentWeek, currentUserKey]);
   const questCompletionKey = useMemo(
-    () => (pod ? `quest:${pod.id}:${currentWeek}:${currentUserId}` : null),
-    [pod, currentWeek, currentUserId]
+    () => (pod ? `quest:${pod.id}:${currentWeek}:${currentUserKey}` : null),
+    [pod, currentWeek, currentUserKey]
   );
 
   useEffect(() => {
@@ -283,7 +381,7 @@ const PodDashboard: React.FC = () => {
   }, [questCompletionKey]);
 
   useEffect(() => {
-    if (bundle.spaces.length === 0 || !pod) return;
+    if (bundle.spaces.length === 0 || !pod || !pod.zone) return;
     const overrides: Record<string, boolean> = {};
     bundle.spaces.forEach((space) => {
       const override = localStorage.getItem(`spaceAvail:${space.id}`);
@@ -319,15 +417,6 @@ const PodDashboard: React.FC = () => {
     }
   }, []);
 
-  const persistPoints = (value: number) => {
-    try {
-      localStorage.setItem('points', value.toString());
-      window.dispatchEvent(new CustomEvent('pods:points-updated', { detail: value }));
-    } catch (error) {
-      console.error('Unable to persist points', error);
-    }
-  };
-
   const awardBadge = (badgeId: string) => {
     const badge = bundle.badges.find((item) => item.id === badgeId);
     if (!badge) return;
@@ -346,9 +435,10 @@ const PodDashboard: React.FC = () => {
   };
 
   const updateWeek = (nextWeek: number) => {
-    setCurrentWeek(nextWeek);
+    const safeWeek = clampWeek(nextWeek);
+    setCurrentWeek(safeWeek);
     try {
-      localStorage.setItem('currentWeek', nextWeek.toString());
+      localStorage.setItem('currentWeek', safeWeek.toString());
     } catch (error) {
       console.error('Unable to persist current week', error);
     }
@@ -356,29 +446,19 @@ const PodDashboard: React.FC = () => {
 
   const handleCheckIn = () => {
     if (!pod || !checkinKey || isCheckedInThisWeek) return;
-    setPoints((prev) => {
-      const next = prev + 10;
-      persistPoints(next);
-      return next;
-    });
+    const next = adjustPoints(currentUserKey, 10);
+    setPointsState(next);
     localStorage.setItem(checkinKey, '1');
     setIsCheckedInThisWeek(true);
   };
 
   const handleCompleteQuest = () => {
     if (!pod || !quest || !questCompletionKey || questCompleted) return;
-    setPoints((prev) => {
-      const next = prev + quest.points.base;
-      persistPoints(next);
-      return next;
-    });
+    const next = adjustPoints(currentUserKey, quest.points.base);
+    setPointsState(next);
     localStorage.setItem(questCompletionKey, '1');
     setQuestCompleted(true);
     awardBadge(quest.badges[0]);
-    setTimeout(() => {
-      updateWeek(currentWeek >= 4 ? 1 : currentWeek + 1);
-      setQuestCompleted(false);
-    }, 600);
   };
 
   const updateSelectedSpace = (space: Space) => {
@@ -419,6 +499,16 @@ const PodDashboard: React.FC = () => {
   const sortedRewards = useMemo(() => [...bundle.rewards].sort((a, b) => a.cost - b.cost), [bundle.rewards]);
   const nextReward = sortedRewards.find((reward) => reward.cost > points) ?? sortedRewards[sortedRewards.length - 1];
   const progressToNextReward = nextReward ? Math.min(1, points / nextReward.cost) : 0;
+  const captainDisplayName = useMemo(() => {
+    if (isCaptain) {
+      return currentUserName;
+    }
+    if (pod?.captainId) {
+      const match = bundle.users.find((user) => user.id === pod.captainId);
+      return match?.name || 'Captain TBD';
+    }
+    return 'Captain TBD';
+  }, [isCaptain, currentUserName, pod?.captainId, bundle.users]);
 
   if (isLoadingData || !signupPrefs) {
     return <div className="p-4">Loading your pod…</div>;
@@ -438,30 +528,52 @@ const PodDashboard: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      <section className="bg-white/80 backdrop-blur border border-white/60 rounded-2xl shadow-xl p-6 sm:p-8 flex flex-col gap-4">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <section className="bg-white/80 backdrop-blur border border-white/60 rounded-2xl shadow-xl p-6 sm:p-8 flex flex-col gap-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-sm uppercase tracking-wide text-asuMaroon/80">Welcome back</p>
             <h1 className="text-3xl sm:text-4xl font-extrabold text-asuMaroon">{currentUserName}</h1>
             <p className="text-gray-600 mt-2">
-              {pod.zone} Pod · {pod.timeslot} · {podMembers.length} members
+              {(pod.zone || 'Zone TBD')} Pod · {pod.timeslot || 'Time TBD'} · {podMembers.length} members
             </p>
           </div>
-          <div className="flex gap-3 items-center">
-            <div className="bg-asuMaroon text-white rounded-2xl px-5 py-3 text-center">
+          <div className="flex flex-wrap items-stretch gap-3">
+            <div className="bg-asuMaroon text-white rounded-2xl px-5 py-3 text-center shadow">
               <p className="text-xs uppercase tracking-wide text-white/70">Current Week</p>
-              <p className="text-2xl font-bold">{currentWeek} / 4</p>
+              <p className="text-2xl font-bold">{currentWeek} / 14</p>
+              {isCaptain && (
+                <div className="mt-3 flex justify-center gap-2 text-xs font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => updateWeek(currentWeek - 1)}
+                    className="rounded-full border border-white/40 px-2 py-0.5 hover:bg-white/10"
+                  >
+                    −
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateWeek(currentWeek + 1)}
+                    className="rounded-full border border-white/40 px-2 py-0.5 hover:bg-white/10"
+                  >
+                    +
+                  </button>
+                </div>
+              )}
             </div>
-            <div className="bg-asuGold text-black rounded-2xl px-5 py-3 text-center">
+            <div className="bg-asuGold text-black rounded-2xl px-5 py-3 text-center shadow">
               <p className="text-xs uppercase tracking-wide text-black/60">Captain</p>
-              <p className="text-lg font-semibold">
-                {bundle.users.find((user) => user.id === pod.captainId)?.name || 'TBD'}
-              </p>
+              <p className="text-lg font-semibold">{captainDisplayName}</p>
+              {isCaptainCandidate && (
+                <p className="text-[11px] font-semibold text-asuMaroon">Pending approval</p>
+              )}
+              {!pod.captainId && !isCaptain && !isCaptainCandidate && (
+                <p className="text-[11px] font-semibold text-asuMaroon">Role open — apply to lead</p>
+              )}
             </div>
           </div>
         </div>
         <div className="flex flex-wrap gap-2 text-xs text-gray-600">
-          {pod.interests.slice(0, 5).map((interest) => (
+          {pod.interests.slice(0, 6).map((interest) => (
             <span key={interest} className="px-3 py-1 rounded-full bg-asuGray text-asuMaroon/80">
               {interest}
             </span>
@@ -476,7 +588,14 @@ const PodDashboard: React.FC = () => {
             {podMembers.map((member) => (
               <li key={member.id} className="flex items-center justify-between">
                 <span>{member.name}</span>
-                <span className="text-xs uppercase tracking-wide text-gray-400">{member.id === pod.captainId ? 'Captain' : 'Member'}</span>
+                <span className="text-xs uppercase tracking-wide text-gray-400">
+                  {(() => {
+                    if (isCaptain && member.id === currentUserKey) return 'Captain';
+                    if (isCaptainCandidate && member.id === currentUserKey) return 'Candidate';
+                    if (pod.captainId && member.id === pod.captainId) return 'Captain';
+                    return 'Member';
+                  })()}
+                </span>
               </li>
             ))}
           </ul>
@@ -485,34 +604,36 @@ const PodDashboard: React.FC = () => {
           </p>
         </div>
         <div className="lg:col-span-2 bg-white/80 backdrop-blur border border-white/60 rounded-2xl shadow-xl p-6 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h2 className="text-xl font-bold text-asuMaroon">Connection Quest · Week {currentWeek}</h2>
-              <p className="text-base text-gray-700 font-semibold">{quest.title}</p>
-              <p className="text-sm text-gray-600">{quest.description}</p>
-            </div>
-            <div className="flex flex-col gap-3 min-w-[200px]">
-              <button
-                onClick={handleCheckIn}
-                disabled={isCheckedInThisWeek}
-                className={`rounded-full px-4 py-2 font-semibold text-sm transition ${
-                  isCheckedInThisWeek ? 'bg-asuGray text-gray-500 cursor-not-allowed' : 'bg-asuMaroon text-white hover:bg-[#6f1833]'
-                }`}
-              >
-                {isCheckedInThisWeek ? 'Checked In' : 'Check in (+10)'}
-              </button>
-              <button
-                onClick={handleCompleteQuest}
-                disabled={questCompleted}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-bold text-asuMaroon">Connection Quest · Week {currentWeek}</h2>
+                <p className="text-base text-gray-700 font-semibold">{quest.title}</p>
+                <p className="text-sm text-gray-600">{quest.description}</p>
+              </div>
+              <div className="flex flex-col gap-3 min-w-[200px]">
+                <button
+                  onClick={handleCheckIn}
+                  disabled={isCheckedInThisWeek}
+                  className={`rounded-full px-4 py-2 font-semibold text-sm transition ${
+                    isCheckedInThisWeek ? 'bg-asuGray text-gray-500 cursor-not-allowed' : 'bg-asuMaroon text-white hover:bg-[#6f1833]'
+                  }`}
+                >
+                  {isCheckedInThisWeek ? 'Checked In' : 'Check in (+10)'}
+                </button>
+                <p className="text-xs text-gray-500 text-center">
+                  {isCheckedInThisWeek
+                    ? `Great work—next check-in unlocks on Week ${clampWeek(currentWeek + 1)}.`
+                    : 'One check-in per week keeps your pod energized.'}
+                </p>
+                <button
+                  onClick={handleCompleteQuest}
+                  disabled={questCompleted}
                 className={`rounded-full px-4 py-2 font-semibold text-sm transition ${
                   questCompleted ? 'bg-asuGray text-gray-500 cursor-not-allowed' : 'bg-asuGold text-black hover:brightness-95'
                 }`}
               >
                 {questCompleted ? 'Quest Completed' : 'Complete Quest (+30)'}
               </button>
-              {isCheckedInThisWeek && (
-                <p className="text-xs text-asuMaroon font-semibold text-center">Checked in for Week {currentWeek}</p>
-              )}
             </div>
           </div>
         </div>
@@ -523,7 +644,7 @@ const PodDashboard: React.FC = () => {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <p className="text-sm uppercase tracking-wide text-asuMaroon/80">Pod points</p>
-              <h2 className="text-3xl font-extrabold text-asuMaroon">{points.toLocaleString()} pts</h2>
+              <h2 className="text-3xl font-extrabold text-asuMaroon">{displayedPoints.toLocaleString()} pts</h2>
             </div>
             <button
               onClick={() => navigate('/store')}
@@ -630,7 +751,7 @@ const PodDashboard: React.FC = () => {
             >
               Redeem Rewards
             </button>
-            {isCaptain && (
+            {(isCaptain || isCaptainCandidate) && (
               <button
                 onClick={() => navigate('/captain')}
                 className="rounded-2xl border border-asuGold/40 bg-asuGold/20 px-4 py-3 text-sm font-semibold text-asuMaroon hover:brightness-95"

@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getPoints, setPoints as setStoredPoints } from '../lib/points';
+import { currentUserId as getCurrentUserId } from '../lib/roles';
 
 type Reward = {
   id: string;
@@ -13,8 +15,7 @@ const Store: React.FC = () => {
   const [rewards, setRewards] = useState<Reward[]>([]);
   const [points, setPoints] = useState<number>(() => {
     if (typeof window === 'undefined') return 0;
-    const stored = localStorage.getItem('points');
-    return stored ? parseInt(stored, 10) || 0 : 0;
+    return getPoints(getCurrentUserId());
   });
   const [redeemed, setRedeemed] = useState<string[]>(() => {
     if (typeof window === 'undefined') return [];
@@ -56,11 +57,30 @@ const Store: React.FC = () => {
       });
   }, []);
 
+  useEffect(() => {
+    const syncPoints = () => setPoints(getPoints(getCurrentUserId()));
+    const handlePoints = (event: Event) => {
+      const detail = (event as CustomEvent<number | undefined>).detail;
+      if (typeof detail === 'number') {
+        setPoints(detail);
+      } else {
+        syncPoints();
+      }
+    };
+    window.addEventListener('pods:points-updated', handlePoints as EventListener);
+    window.addEventListener('storage', syncPoints);
+    window.addEventListener('pods:session-updated', syncPoints);
+    return () => {
+      window.removeEventListener('pods:points-updated', handlePoints as EventListener);
+      window.removeEventListener('storage', syncPoints);
+      window.removeEventListener('pods:session-updated', syncPoints);
+    };
+  }, []);
+
   const persistPoints = (value: number) => {
     setPoints(value);
     try {
-      localStorage.setItem('points', value.toString());
-      window.dispatchEvent(new CustomEvent('pods:points-updated', { detail: value }));
+      setStoredPoints(getCurrentUserId(), value);
     } catch (error) {
       console.error('Unable to persist points after redemption', error);
     }

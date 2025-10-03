@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { setRole, setCurrentUserId } from '../lib/roles';
 
 const ZONES = ['Tempe', 'West', 'Poly', 'DTPHX'] as const;
 const TIMESLOTS = [
@@ -28,11 +29,6 @@ type KnownUser = {
   email: string;
 };
 
-type PodSummary = {
-  id: string;
-  captainId: string;
-};
-
 type SignupPayload = {
   zone: string;
   times: string[];
@@ -57,7 +53,6 @@ const SignUp: React.FC = () => {
   const [name, setName] = useState<string>('');
   const [email, setEmail] = useState<string>('');
   const [knownUsers, setKnownUsers] = useState<KnownUser[]>([]);
-  const [pods, setPods] = useState<PodSummary[]>([]);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
@@ -90,7 +85,7 @@ const SignUp: React.FC = () => {
   useEffect(() => {
     const hydrate = async () => {
       try {
-        const [usersRes, podsRes] = await Promise.all([fetch('/data/users.json'), fetch('/data/pods.json')]);
+        const [usersRes] = await Promise.all([fetch('/data/users.json')]);
         if (usersRes.ok) {
           const usersJson = await usersRes.json();
           if (Array.isArray(usersJson)) {
@@ -99,17 +94,6 @@ const SignUp: React.FC = () => {
                 id: String(user.id),
                 name: String(user.name),
                 email: String(user.email || '').toLowerCase(),
-              }))
-            );
-          }
-        }
-        if (podsRes.ok) {
-          const podsJson = await podsRes.json();
-          if (Array.isArray(podsJson)) {
-            setPods(
-              podsJson.map((pod: any) => ({
-                id: String(pod.id),
-                captainId: String(pod.captainId),
               }))
             );
           }
@@ -167,34 +151,27 @@ const SignUp: React.FC = () => {
 
     let resolvedUserId = 'me';
     let resolvedName = name?.trim() || 'Guest';
-    let resolvedCaptain = false;
-
     if (email.trim()) {
       const match = knownUsers.find((user) => user.email === email.trim().toLowerCase());
       if (match) {
         resolvedUserId = match.id;
         resolvedName = match.name;
-        resolvedCaptain = pods.some((pod) => pod.captainId === match.id);
       }
     }
 
     try {
-      localStorage.setItem('currentUserId', resolvedUserId);
+      setCurrentUserId(resolvedUserId);
       localStorage.setItem('currentUserName', resolvedName);
       if (email) {
         localStorage.setItem('currentUserEmail', email);
       }
-      localStorage.setItem('isCaptain', resolvedCaptain ? 'true' : 'false');
+      setRole('student');
       window.dispatchEvent(new Event('pods:session-updated'));
     } catch (error) {
       console.error('Unable to persist session metadata', error);
     }
 
-    setStatusMessage(
-      resolvedCaptain
-        ? 'Welcome back, Captain! Routing you to your pod dashboard…'
-        : 'Awesome! We are matching you with your pod…'
-    );
+    setStatusMessage('Awesome! We are matching you with your pod…');
     navigate('/dashboard', { replace: true });
     setTimeout(() => setIsSubmitting(false), 250);
   };

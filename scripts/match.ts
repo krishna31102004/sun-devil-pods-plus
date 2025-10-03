@@ -19,7 +19,6 @@ interface Pod {
   interests: string[];
   tags: string[];
   memberIds: string[];
-  captainId: string;
   points: number;
   level: number;
   vibe: number;
@@ -142,7 +141,6 @@ function matchPods(users: User[]): Pod[] {
           interests: commonInterests,
           tags: allTags,
           memberIds: podMembers.map((u) => u.id),
-          captainId: podMembers[0].id,
           points: 0,
           level: 1,
           vibe: 0

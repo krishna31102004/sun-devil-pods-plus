@@ -27,7 +27,7 @@
       "u-003",
       "u-004"
     ],
-    "captainId": "u-002",
+    "captainId": null,
     "points": 0,
     "level": 1,
     "vibe": 0
@@ -61,7 +61,7 @@
       "u-012",
       "u-009"
     ],
-    "captainId": "u-008",
+    "captainId": null,
     "points": 0,
     "level": 1,
     "vibe": 0
@@ -94,7 +94,7 @@
       "u-015",
       "u-016"
     ],
-    "captainId": "u-014",
+    "captainId": null,
     "points": 0,
     "level": 1,
     "vibe": 0
@@ -128,7 +128,7 @@
       "u-021",
       "u-022"
     ],
-    "captainId": "u-019",
+    "captainId": null,
     "points": 0,
     "level": 1,
     "vibe": 0
