@@ -1,0 +1,29 @@
+{
+  "name": "sundevil-pods-prototype",
+  "version": "1.0.0",
+  "description": "Prototype skeleton for SunDevil Pods+ hackathon project.",
+  "main": "index.js",
+  "scripts": {
+    "match": "ts-node -O '{\"module\":\"CommonJS\"}' scripts/match.ts",
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "csv-parse": "^5.4.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.15.0"
+  },
+  "devDependencies": {
+    "ts-node": "^10.9.1",
+    "typescript": "^5.3.3",
+    "vite": "^4.5.0",
+    "@vitejs/plugin-react": "^4.0.0",
+    "tailwindcss": "^3.4.0",
+    "postcss": "^8.4.25",
+    "autoprefixer": "^10.4.14"
+    ,"@types/react": "^18.2.0"
+    ,"@types/react-dom": "^18.2.0"
+  }
+}

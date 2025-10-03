@@ -1,0 +1,10 @@
+[
+  {"id": "first_hello", "name": "First Hello", "icon": "👋", "criteria": "Completed the first hello quest"},
+  {"id": "ritual_maker", "name": "Ritual Maker", "icon": "🕰️", "criteria": "Established a pod ritual"},
+  {"id": "friendly_inviter", "name": "Friendly Inviter", "icon": "😊", "criteria": "Invited peers to connect"},
+  {"id": "commuter_hero", "name": "Commuter Hero", "icon": "🚗", "criteria": "Helped commuters meet at midday"},
+  {"id": "repair_ready", "name": "Repair Ready", "icon": "🔧", "criteria": "Practiced conflict repair"},
+  {"id": "language_ally", "name": "Language Ally", "icon": "🌍", "criteria": "Supported language accessibility"},
+  {"id": "club_connector", "name": "Club Connector", "icon": "🎉", "criteria": "Bridged to campus clubs"},
+  {"id": "sensory_friendly", "name": "Sensory Friendly", "icon": "🧘", "criteria": "Hosted a low-stimulus social"}
+]

@@ -1,0 +1,58 @@
+[
+  {
+    "id": "quest1", "week": 1,
+    "title": "First Hello",
+    "description": "Each member shares their name, year, and one welcome cue.",
+    "badges": ["first_hello"],
+    "points": {"base": 30, "coop4": 10, "coop6": 20}
+  },
+  {
+    "id": "quest2", "week": 1,
+    "title": "Choose Our Ritual",
+    "description": "As a pod, decide on a 10-minute weekly ritual (tea circle, study sprint, etc.).",
+    "badges": ["ritual_maker"],
+    "points": {"base": 30, "coop4": 10, "coop6": 20}
+  },
+  {
+    "id": "quest3", "week": 2,
+    "title": "Two-Step Invite",
+    "description": "Each member invites one peer outside the pod to a low-stakes hangout.",
+    "badges": ["friendly_inviter"],
+    "points": {"base": 30, "coop4": 10, "coop6": 20}
+  },
+  {
+    "id": "quest4", "week": 2,
+    "title": "Midday Meetup",
+    "description": "For commuter pods: meet between 11:30 and 1:30 near transit or parking.",
+    "badges": ["commuter_hero"],
+    "points": {"base": 30, "coop4": 10, "coop6": 20}
+  },
+  {
+    "id": "quest5", "week": 3,
+    "title": "Oops/Ouch Practice",
+    "description": "Run a 2-minute reset using the Oops/Ouch script to practice conflict repair.",
+    "badges": ["repair_ready"],
+    "points": {"base": 30, "coop4": 10, "coop6": 20}
+  },
+  {
+    "id": "quest6", "week": 3,
+    "title": "Language Ally",
+    "description": "Use a visual agenda and slower pacing once; try a translation app if needed.",
+    "badges": ["language_ally"],
+    "points": {"base": 30, "coop4": 10, "coop6": 20}
+  },
+  {
+    "id": "quest7", "week": 4,
+    "title": "Club Bridge",
+    "description": "Attend one organization meeting or campus event together as a pod.",
+    "badges": ["club_connector"],
+    "points": {"base": 30, "coop4": 10, "coop6": 20}
+  },
+  {
+    "id": "quest8", "week": 4,
+    "title": "Low-Stimulus Social",
+    "description": "Host a quiet meetup for half the session in a sensory-friendly space.",
+    "badges": ["sensory_friendly"],
+    "points": {"base": 30, "coop4": 10, "coop6": 20}
+  }
+]
