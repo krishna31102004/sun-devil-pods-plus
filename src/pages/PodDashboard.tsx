@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SpacePicker, { Space } from '../components/SpacePicker';
 import BelongingPulse from '../components/BelongingPulse';
-import BadgeAvatar from '../components/BadgeAvatar';
+import { formatTagLabel } from '../lib/tagOptions';
 import { getRole, Role } from '../lib/roles';
 import { adjustPoints, getPoints } from '../lib/points';
 
@@ -510,6 +510,11 @@ const PodDashboard: React.FC = () => {
     return 'Captain TBD';
   }, [isCaptain, currentUserName, pod?.captainId, bundle.users]);
 
+  const dashboardInterests = ((signupPrefs?.interests?.length ? signupPrefs.interests : pod?.interests) ?? []).filter(
+    (interest) => interest && interest.trim().length > 0
+  );
+  const dashboardTags = (signupPrefs?.tags ?? []).filter((tag) => tag && tag.trim().length > 0);
+
   if (isLoadingData || !signupPrefs) {
     return <div className="p-4">Loading your pod…</div>;
   }
@@ -573,12 +578,21 @@ const PodDashboard: React.FC = () => {
           </div>
         </div>
         <div className="flex flex-wrap gap-2 text-xs text-gray-600">
-          {pod.interests.slice(0, 6).map((interest) => (
+          {dashboardInterests.map((interest) => (
             <span key={interest} className="px-3 py-1 rounded-full bg-asuGray text-asuMaroon/80">
               {interest}
             </span>
           ))}
         </div>
+        {dashboardTags.length > 0 && (
+          <div className="flex flex-wrap gap-2 text-[11px] text-asuMaroon/80">
+            {dashboardTags.map((tag) => (
+              <span key={tag} className="rounded-full border border-asuMaroon/30 px-3 py-1 bg-white/70">
+                {formatTagLabel(tag)}
+              </span>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="grid gap-6 lg:grid-cols-3">
@@ -666,20 +680,39 @@ const PodDashboard: React.FC = () => {
           )}
           <div>
             <h3 className="text-sm font-semibold text-asuMaroon uppercase tracking-wide mb-3">Badges</h3>
-            <div className="grid gap-3 grid-cols-[repeat(auto-fit,minmax(64px,1fr))]">
+            <ul className="space-y-3 text-sm text-gray-700">
               {bundle.badges
                 .slice()
                 .sort((a, b) => {
-                  const unlocked = unlockedBadges.map((badge) => badge.id);
-                  const aUnlocked = unlocked.includes(a.id);
-                  const bUnlocked = unlocked.includes(b.id);
+                  const unlockedIds = unlockedBadges.map((badge) => badge.id);
+                  const aUnlocked = unlockedIds.includes(a.id);
+                  const bUnlocked = unlockedIds.includes(b.id);
                   if (aUnlocked === bUnlocked) return a.name.localeCompare(b.name);
                   return aUnlocked ? -1 : 1;
                 })
-                .map((badge) => (
-                  <BadgeAvatar key={badge.id} badge={badge} unlocked={unlockedBadges.some((item) => item.id === badge.id)} />
-                ))}
-            </div>
+                .map((badge) => {
+                  const unlocked = unlockedBadges.some((item) => item.id === badge.id);
+                  return (
+                    <li
+                      key={badge.id}
+                      className={`flex items-start gap-3 rounded-xl border px-3 py-2 ${
+                        unlocked ? 'border-asuMaroon/40 bg-asuMaroon/5' : 'border-asuGray bg-white/70'
+                      }`}
+                    >
+                      <span className="text-2xl" aria-hidden>
+                        {badge.icon || '🏅'}
+                      </span>
+                      <div className="flex-1">
+                        <p className={`text-sm font-semibold ${unlocked ? 'text-asuMaroon' : 'text-gray-600'}`}>{badge.name}</p>
+                        <p className="text-xs text-gray-500">{badge.criteria}</p>
+                      </div>
+                      <span className={`text-[11px] font-semibold uppercase tracking-wide ${unlocked ? 'text-asuMaroon' : 'text-gray-400'}`}>
+                        {unlocked ? 'Unlocked' : 'Locked'}
+                      </span>
+                    </li>
+                  );
+                })}
+            </ul>
           </div>
         </div>
         <div className="bg-white/80 backdrop-blur border border-white/60 rounded-2xl shadow-xl p-6 space-y-4">
@@ -745,6 +778,14 @@ const PodDashboard: React.FC = () => {
         <div className="bg-white/80 backdrop-blur border border-white/60 rounded-2xl shadow-xl p-6 space-y-4">
           <h2 className="text-xl font-bold text-asuMaroon">Quick Actions</h2>
           <div className="grid gap-3 sm:grid-cols-2">
+            {!isCaptain && !isCaptainCandidate && (
+              <button
+                onClick={() => navigate('/apply')}
+                className="sm:col-span-2 rounded-2xl border border-asuMaroon bg-asuMaroon text-white px-4 py-3 text-sm font-semibold shadow hover:bg-[#6f1833]"
+              >
+                Become a Peer Captain
+              </button>
+            )}
             <button
               onClick={() => navigate('/store')}
               className="rounded-2xl border border-asuMaroon/30 bg-asuMaroon/5 px-4 py-3 text-sm font-semibold text-asuMaroon hover:bg-asuMaroon/10"
@@ -760,7 +801,7 @@ const PodDashboard: React.FC = () => {
               </button>
             )}
             <button
-              onClick={() => navigate('/')}
+              onClick={() => navigate('/signup')}
               className="rounded-2xl border border-asuGray bg-asuGray px-4 py-3 text-sm font-semibold text-asuMaroon hover:border-asuMaroon/30"
             >
               Update Preferences

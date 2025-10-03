@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { setRole, setCurrentUserId } from '../lib/roles';
+import { TAG_OPTIONS } from '../lib/tagOptions';
 
 const ZONES = ['Tempe', 'West', 'Poly', 'DTPHX'] as const;
 const TIMESLOTS = [
@@ -16,7 +17,6 @@ const TIMESLOTS = [
   'Sat 13:00',
   'Sun 10:00',
 ] as const;
-const TAGS = ['commuter', 'international', 'first_gen', 'sensory', 'mobility', 'language_ally'] as const;
 
 type InterestData = {
   id: string;
@@ -46,10 +46,11 @@ const defaultPayload: SignupPayload = {
 const SignUp: React.FC = () => {
   const navigate = useNavigate();
   const [interestOptions, setInterestOptions] = useState<InterestData[]>([]);
-  const [interests, setInterests] = useState<string[]>(defaultPayload.interests);
+  const [interestInput, setInterestInput] = useState<string>('');
   const [times, setTimes] = useState<string[]>(defaultPayload.times);
   const [zone, setZone] = useState<string>(defaultPayload.zone);
   const [tags, setTags] = useState<string[]>(defaultPayload.tags);
+  const [otherTag, setOtherTag] = useState<string>('');
   const [name, setName] = useState<string>('');
   const [email, setEmail] = useState<string>('');
   const [knownUsers, setKnownUsers] = useState<KnownUser[]>([]);
@@ -119,21 +120,41 @@ const SignUp: React.FC = () => {
         const parsed = JSON.parse(storedSignup) as Partial<SignupPayload>;
         if (parsed.zone) setZone(parsed.zone);
         if (Array.isArray(parsed.times)) setTimes(parsed.times.map(String));
-        if (Array.isArray(parsed.interests)) setInterests(parsed.interests.map(String));
-        if (Array.isArray(parsed.tags)) setTags(parsed.tags.map(String));
+        if (Array.isArray(parsed.interests)) {
+          const restoredInterests = parsed.interests.map(String);
+          setInterestInput(restoredInterests.join('; '));
+        }
+        if (Array.isArray(parsed.tags)) {
+          const restoredTags = parsed.tags.map(String);
+          const otherEntry = restoredTags.find((value) => value.startsWith('other:'));
+          const baseTags = restoredTags.filter((value) => !value.startsWith('other:'));
+          setTags(baseTags);
+          if (otherEntry) {
+            setOtherTag(otherEntry.slice('other:'.length));
+          }
+        }
       }
     } catch (error) {
       console.error('Unable to restore signup data', error);
     }
   }, []);
 
+  const parseDelimitedInput = (value: string): string[] =>
+    value
+      .split(/[,;]+/)
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+
   const toggleArrayValue = (value: string, arr: string[], setter: (values: string[]) => void) => {
     setter(arr.includes(value) ? arr.filter((item) => item !== value) : [...arr, value]);
   };
 
-  const interestsByColumn = useMemo(() => {
-    const half = Math.ceil(interestOptions.length / 2);
-    return [interestOptions.slice(0, half), interestOptions.slice(half)];
+  const interestPlaceholder = useMemo(() => {
+    if (interestOptions.length === 0) {
+      return 'e.g., study sprint; anime; soccer; weekend hikes';
+    }
+    const suggestions = interestOptions.slice(0, 4).map((item) => item.name.toLowerCase());
+    return `e.g., ${suggestions.join('; ')}`;
   }, [interestOptions]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -141,7 +162,14 @@ const SignUp: React.FC = () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
 
-    const payload: SignupPayload = { zone, times, interests, tags };
+    const parsedInterests = parseDelimitedInput(interestInput);
+    const normalizedTags = [...tags];
+    const customTag = otherTag.trim();
+    if (customTag) {
+      normalizedTags.push(`other:${customTag}`);
+    }
+
+    const payload: SignupPayload = { zone, times, interests: parsedInterests, tags: normalizedTags };
     try {
       localStorage.setItem('signupData', JSON.stringify(payload));
       localStorage.setItem('signupProfile', JSON.stringify({ name, email }));
@@ -216,27 +244,20 @@ const SignUp: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-asuMaroon uppercase tracking-wide mb-3">Interests (pick any)</label>
-            <div className="grid gap-4 md:grid-cols-2">
-              {interestsByColumn.map((column, columnIdx) => (
-                <div key={`interest-column-${columnIdx}`} className="space-y-2">
-                  {column.map((interest) => (
-                    <label
-                      key={interest.id}
-                      className="flex items-center justify-between rounded-xl border border-asuGray bg-asuGray/40 px-4 py-2 text-sm"
-                    >
-                      <span className="text-gray-800">{interest.name}</span>
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 text-asuMaroon focus:ring-asuMaroon"
-                        checked={interests.includes(interest.name)}
-                        onChange={() => toggleArrayValue(interest.name, interests, setInterests)}
-                      />
-                    </label>
-                  ))}
-                </div>
-              ))}
-            </div>
+            <label className="block text-sm font-semibold text-asuMaroon uppercase tracking-wide mb-3">Interests</label>
+            <textarea
+              value={interestInput}
+              onChange={(event) => {
+                const value = event.target.value;
+                setInterestInput(value);
+              }}
+              rows={4}
+              placeholder={interestPlaceholder}
+              className="w-full rounded-2xl border border-asuGray bg-white/70 px-4 py-3 text-sm shadow-inner focus:outline-none focus:ring-2 focus:ring-asuMaroon/40"
+            />
+            <p className="mt-2 text-xs text-gray-500">
+              Separate interests with commas or semicolons. We&apos;ll display them exactly as written on your dashboard.
+            </p>
           </div>
 
           <div>
@@ -278,26 +299,46 @@ const SignUp: React.FC = () => {
             </select>
           </div>
 
-          <div>
-            <label className="block text-sm font-semibold text-asuMaroon uppercase tracking-wide mb-3">Optional tags</label>
-            <div className="flex flex-wrap gap-3">
-              {TAGS.map((tag) => {
-                const selected = tags.includes(tag);
+          <fieldset className="space-y-3">
+            <legend className="block text-sm font-semibold text-asuMaroon uppercase tracking-wide">Optional tags</legend>
+            <div className="flex flex-wrap gap-2">
+              {TAG_OPTIONS.map((option) => {
+                const selected = tags.includes(option.value);
                 return (
-                  <button
-                    key={tag}
-                    type="button"
-                    onClick={() => toggleArrayValue(tag, tags, setTags)}
-                    className={`px-4 py-2 rounded-full text-sm font-medium transition border ${
-                      selected ? 'border-asuMaroon bg-asuMaroon text-white shadow' : 'border-asuGray bg-white/70 text-asuMaroon hover:border-asuMaroon/50'
+                  <label
+                    key={option.value}
+                    className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition ${
+                      selected
+                        ? 'border-asuMaroon bg-asuMaroon text-white shadow'
+                        : 'border-asuGray bg-white/70 text-asuMaroon hover:border-asuMaroon/50'
                     }`}
                   >
-                    {tag.replace('_', ' ')}
-                  </button>
+                    <input
+                      type="checkbox"
+                      className="sr-only"
+                      checked={selected}
+                      onChange={() => toggleArrayValue(option.value, tags, setTags)}
+                    />
+                    <span>{option.label}</span>
+                    <span className="sr-only">{selected ? 'Selected' : 'Not selected'}</span>
+                  </label>
                 );
               })}
             </div>
-          </div>
+            <label className="block text-xs text-gray-600">
+              <span className="font-semibold text-asuMaroon block mb-1">Other (optional)</span>
+              <input
+                type="text"
+                value={otherTag}
+                onChange={(event) => setOtherTag(event.target.value)}
+                placeholder="Add another identity or support need"
+                className="w-full rounded-xl border border-asuGray bg-white/70 px-4 py-2 text-sm shadow-inner focus:outline-none focus:ring-2 focus:ring-asuGold/50"
+              />
+            </label>
+            <p className="text-xs text-gray-500">
+              We&apos;ll include any custom entry along with the selected support tags.
+            </p>
+          </fieldset>
 
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <p className="text-sm text-gray-500">

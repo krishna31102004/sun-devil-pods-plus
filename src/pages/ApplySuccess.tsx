@@ -14,11 +14,9 @@ const ApplySuccess: React.FC = () => (
     <section className="grid gap-6 md:grid-cols-2">
       <div className="rounded-3xl border border-asuGold/50 bg-asuGold/20 p-6 shadow-lg">
         <h2 className="text-xl font-bold text-asuMaroon">What&apos;s in it for you</h2>
-        <ul className="mt-4 space-y-2 text-sm text-asuMaroon/90">
-          <li>• Personalized letter of recommendation from the Dean&apos;s office</li>
-          <li>• $250 leadership micro-award at semester close</li>
-          <li>• Exclusive access to peer leader retreats and swag drops</li>
-        </ul>
+        <p className="mt-4 text-sm text-asuMaroon/90">
+          Letter of recommendation and an award for guiding students throughout the semester.
+        </p>
       </div>
       <div className="rounded-3xl border border-white/60 bg-white/80 p-6 shadow-xl backdrop-blur">
         <h2 className="text-xl font-bold text-asuMaroon">Next up</h2>

@@ -108,6 +108,9 @@ const Store: React.FC = () => {
     <div className="space-y-6">
       <div className="bg-white/80 backdrop-blur border border-white/60 rounded-2xl shadow-xl p-6 sm:p-8 space-y-3">
         <h1 className="text-3xl font-extrabold text-asuMaroon">Pod Rewards Store</h1>
+        <div className="rounded-2xl border border-asuGold/40 bg-asuGold/20 px-4 py-2 text-xs font-semibold text-asuMaroon">
+          Powered by Sun Devil Rewards (mock integration)
+        </div>
         <p className="text-gray-600 text-sm">
           Trade the points your pod has earned for celebratory perks. Keep attending quests and checking in to unlock bigger rewards!
         </p>

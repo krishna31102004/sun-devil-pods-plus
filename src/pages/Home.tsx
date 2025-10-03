@@ -1,6 +1,12 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 
+const partnerLogos = [
+  { src: '/assets/logos/ssc.svg', alt: 'Student Success Center logo' },
+  { src: '/assets/logos/sun-devil-rewards.svg', alt: 'Sun Devil Rewards logo' },
+  { src: '/assets/logos/credentials.svg', alt: 'Sun Devil credentials logo' },
+];
+
 const Home: React.FC = () => (
   <div className="space-y-10">
     <section className="rounded-3xl border border-white/60 bg-gradient-to-r from-asuMaroon/90 via-asuMaroon to-asuGold/80 px-8 py-12 shadow-2xl text-white">
@@ -11,6 +17,23 @@ const Home: React.FC = () => (
           Join a peer pod that matches your energy or step up as a peer captain to guide new Sun Devils. Everything runs
           locally for demo purposes—pick the journey you want to explore.
         </p>
+      </div>
+    </section>
+
+    <section className="rounded-3xl border border-white/60 bg-white/80 px-6 py-4 shadow-xl backdrop-blur">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-xs uppercase tracking-[0.3em] text-asuMaroon/70">Supported by</p>
+        <div className="flex flex-wrap items-center justify-start gap-6">
+          {partnerLogos.map((logo) => (
+            <img
+              key={logo.src}
+              src={logo.src}
+              alt={logo.alt}
+              loading="lazy"
+              className="h-10 w-auto opacity-90"
+            />
+          ))}
+        </div>
       </div>
     </section>
 
