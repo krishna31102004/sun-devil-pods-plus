@@ -4,7 +4,6 @@ Barrier-aware micro-communities (pods of 5–8) matched by zone + 45-min window 
 [Live demo](https://sun-devil-pods-plus.vercel.app)
 
 ## Table of Contents
-- [Demo Screens](#demo-screens)
 - [Key Features](#key-features)
 - [Architecture](#architecture)
 - [Getting Started](#getting-started)
@@ -23,14 +22,6 @@ Barrier-aware micro-communities (pods of 5–8) matched by zone + 45-min window 
 - [Roadmap](#roadmap)
 - [Credits](#credits)
 - [License](#license)
-
-## Demo Screens
-![Home](docs/screenshots/home.png)
-![Sign Up](docs/screenshots/signup.png)
-![Student Dashboard](docs/screenshots/dashboard-student.png)
-![Captain Console](docs/screenshots/captain-console.png)
-![Store](docs/screenshots/store.png)
-![Belonging Pulse](docs/screenshots/pulse.png)
 
 ## Key Features
 - 90-second signup covering interests, availability windows, zones, and optional identity tags
