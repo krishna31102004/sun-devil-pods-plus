@@ -188,40 +188,52 @@ const CaptainApply: React.FC = () => {
         </div>
 
         <div className="mt-6 grid gap-6 lg:grid-cols-2">
-          <fieldset className="rounded-2xl border border-asuGray/60 bg-white/70 p-4 shadow-inner">
-            <legend className="px-2 text-sm font-semibold text-asuMaroon">Campuses / zones you can lead</legend>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              {ZONES.map((zone) => (
-                <label key={zone} className="flex items-center gap-2 text-sm text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={zones.includes(zone)}
-                    onChange={() => toggleSelection(zone, zones, setZones)}
-                    className="rounded border-asuMaroon text-asuMaroon focus:ring-asuMaroon"
-                  />
-                  {zone}
-                </label>
-              ))}
+          <fieldset className="rounded-2xl border border-white/60 bg-white/80 p-6 shadow-inner">
+            <legend className="sr-only">Campuses / zones you can lead</legend>
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-asuMaroon">Campuses / zones you can lead</p>
+                <p className="text-xs text-gray-500">Select every zone you know well. Captains often cover two or more.</p>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {ZONES.map((zone) => (
+                  <label key={zone} className="flex items-center gap-2 rounded-xl border border-transparent px-2 py-1 text-sm text-gray-700 transition hover:border-asuMaroon/30">
+                    <input
+                      type="checkbox"
+                      checked={zones.includes(zone)}
+                      onChange={() => toggleSelection(zone, zones, setZones)}
+                      className="rounded border-asuMaroon text-asuMaroon focus:ring-asuMaroon"
+                    />
+                    {zone}
+                  </label>
+                ))}
+              </div>
             </div>
           </fieldset>
-          <fieldset className="rounded-2xl border border-asuGray/60 bg-white/70 p-4 shadow-inner">
-            <legend className="px-2 text-sm font-semibold text-asuMaroon">Weekly availability</legend>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {AVAILABILITY.map((slot) => {
-                const active = availability.includes(slot);
-                return (
-                  <button
-                    key={slot}
-                    type="button"
-                    onClick={() => toggleSelection(slot, availability, setAvailability)}
-                    className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
-                      active ? 'bg-asuMaroon text-white shadow' : 'bg-asuGray text-gray-600 hover:bg-asuMaroon/20'
-                    }`}
-                  >
-                    {slot}
-                  </button>
-                );
-              })}
+          <fieldset className="rounded-2xl border border-white/60 bg-white/80 p-6 shadow-inner">
+            <legend className="sr-only">Weekly availability</legend>
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-asuMaroon">Weekly availability</p>
+                <p className="text-xs text-gray-500">Tap each block you can host. We recommend setting at least three options.</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {AVAILABILITY.map((slot) => {
+                  const active = availability.includes(slot);
+                  return (
+                    <button
+                      key={slot}
+                      type="button"
+                      onClick={() => toggleSelection(slot, availability, setAvailability)}
+                      className={`rounded-full px-4 py-2 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-asuGold ${
+                        active ? 'bg-asuMaroon text-white shadow-lg' : 'bg-asuGray text-gray-600 hover:bg-asuMaroon/20'
+                      }`}
+                    >
+                      {slot}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </fieldset>
         </div>

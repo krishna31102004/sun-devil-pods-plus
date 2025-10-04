@@ -9,6 +9,8 @@ import path from 'path';
 // definitions or server options.
 export default defineConfig({
   plugins: [react()],
+  // Ensure correct base path for Vercel deployments
+  base: '/',
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),

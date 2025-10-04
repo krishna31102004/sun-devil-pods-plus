@@ -1,39 +1,71 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 
-const partnerLogos = [
-  { src: '/assets/logos/ssc.svg', alt: 'Student Success Center logo' },
-  { src: '/assets/logos/sun-devil-rewards.svg', alt: 'Sun Devil Rewards logo' },
-  { src: '/assets/logos/credentials.svg', alt: 'Sun Devil credentials logo' },
-];
-
 const Home: React.FC = () => (
   <div className="space-y-10">
     <section className="rounded-3xl border border-white/60 bg-gradient-to-r from-asuMaroon/90 via-asuMaroon to-asuGold/80 px-8 py-12 shadow-2xl text-white">
       <div className="max-w-3xl space-y-4">
         <p className="text-sm uppercase tracking-[0.35em] text-white/60">SunDevil Pods+</p>
-        <h1 className="text-4xl font-extrabold sm:text-5xl">Find your people. Grow your impact.</h1>
+        <h1 className="text-4xl font-extrabold sm:text-5xl">Find your people at ASU</h1>
         <p className="text-base text-white/90 sm:text-lg">
-          Join a peer pod that matches your energy or step up as a peer captain to guide new Sun Devils. Everything runs
-          locally for demo purposes—pick the journey you want to explore.
+          Join a pod or lead as a peer captain, then use weekly Connection Quests to turn quick meetups into real
+          friendships.
         </p>
       </div>
     </section>
 
-    <section className="rounded-3xl border border-white/60 bg-white/80 px-6 py-4 shadow-xl backdrop-blur">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-xs uppercase tracking-[0.3em] text-asuMaroon/70">Supported by</p>
-        <div className="flex flex-wrap items-center justify-start gap-6">
-          {partnerLogos.map((logo) => (
-            <img
-              key={logo.src}
-              src={logo.src}
-              alt={logo.alt}
-              loading="lazy"
-              className="h-10 w-auto opacity-90"
-            />
-          ))}
-        </div>
+    <section
+      aria-labelledby="supported-by"
+      className="rounded-3xl border border-white/60 bg-white/80 px-6 py-4 shadow-xl backdrop-blur"
+    >
+      <h3 id="supported-by" className="text-xs uppercase tracking-[0.3em] text-asuMaroon/70">
+        Supported by
+      </h3>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        {/*
+          // Replace these placeholder images by dropping real logos into: /public/partners/
+          // Filenames to keep: ssc-placeholder.png, sun-devil-rewards-placeholder.png, credentials-placeholder.png
+          // Or update the src paths here if you choose different file names.
+        */}
+        <a
+          href="https://students.asu.edu/ssc"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center rounded-2xl bg-white/70 px-3 py-2 shadow-sm ring-1 ring-black/5 transition hover:shadow-md"
+        >
+          <img
+            src="/partners/ssc-placeholder.png"
+            alt="ASU Student Success Center logo"
+            loading="lazy"
+            className="h-8 w-auto md:h-10"
+          />
+        </a>
+        <a
+          href="https://sundevilrewards.asu.edu/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center rounded-2xl bg-white/70 px-3 py-2 shadow-sm ring-1 ring-black/5 transition hover:shadow-md"
+        >
+          <img
+            src="/partners/sun-devil-rewards-placeholder.png"
+            alt="Sun Devil Rewards logo"
+            loading="lazy"
+            className="h-8 w-auto md:h-10"
+          />
+        </a>
+        <a
+          href="https://credentials.asu.edu/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center rounded-2xl bg-white/70 px-3 py-2 shadow-sm ring-1 ring-black/5 transition hover:shadow-md"
+        >
+          <img
+            src="/partners/credentials-placeholder.png"
+            alt="ASU Credentials logo"
+            loading="lazy"
+            className="h-8 w-auto md:h-10"
+          />
+        </a>
       </div>
     </section>
 

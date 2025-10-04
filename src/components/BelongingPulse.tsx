@@ -59,49 +59,74 @@ const BelongingPulse: React.FC<BelongingPulseProps> = ({ onSave, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
-      <div className="bg-white/90 rounded-lg shadow-xl p-6 max-w-md w-full">
-        <h2 className="text-xl font-semibold mb-4 text-indigo-700">Belonging Pulse</h2>
-        <p className="text-sm mb-4 text-gray-700">
-          Reflect on your experience so far. Choose a number from 1 (strongly disagree) to 5 (strongly agree) for each statement.
-        </p>
-        <div className="space-y-4 max-h-96 overflow-y-auto">
-          {PULSE_QUESTIONS.map((q, idx) => (
-            <div key={idx} className="space-y-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                {q}
-              </label>
-              <div className="flex space-x-3">
-                {[1, 2, 3, 4, 5].map(n => (
-                  <label key={n} className="flex flex-col items-center text-xs">
-                    <input
-                      type="radio"
-                      name={`question-${idx}`}
-                      value={n}
-                      checked={scores[idx] === n}
-                      onChange={() => handleChange(idx, n)}
-                      className="mb-1"
-                    />
-                    {n}
-                  </label>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-        <div className="mt-6 flex justify-end space-x-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm text-gray-600 hover:underline"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            className="bg-indigo-600 text-white px-4 py-2 text-sm rounded-md hover:bg-indigo-700 shadow-md"
-          >
-            Save
-          </button>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="belonging-pulse-heading"
+    >
+      <div className="relative w-full max-w-lg overflow-hidden rounded-3xl border border-asuMaroon/15 bg-[#fdf9f3] p-8 text-left shadow-[0_28px_60px_rgba(111,24,51,0.22)]">
+        <div
+          className="pointer-events-none absolute inset-0 rounded-3xl bg-gradient-to-br from-white/60 via-transparent to-transparent"
+          aria-hidden
+        />
+        <div className="relative space-y-6">
+          <header className="space-y-3">
+            <h2 id="belonging-pulse-heading" className="text-2xl font-extrabold text-asuMaroon">
+              Belonging Pulse
+            </h2>
+            <p className="text-sm text-gray-700">
+              Reflect on your experience so far. Choose a number from 1 (strongly disagree) to 5 (strongly agree) for each
+              statement.
+            </p>
+          </header>
+          <div className="space-y-5 max-h-[22rem] overflow-y-auto pr-1">
+            {PULSE_QUESTIONS.map((question, idx) => (
+              <fieldset key={question} className="space-y-3" aria-describedby={`question-${idx}-helper`}>
+                <legend className="text-sm font-semibold text-asuMaroon">{question}</legend>
+                <p id={`question-${idx}-helper`} className="text-xs text-gray-500">
+                  Tap a number to log how you feel right now.
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  {[1, 2, 3, 4, 5].map((value) => (
+                    <label key={value} className="flex flex-col items-center text-xs font-semibold text-asuMaroon">
+                      <input
+                        type="radio"
+                        name={`question-${idx}`}
+                        value={value}
+                        checked={scores[idx] === value}
+                        onChange={() => handleChange(idx, value)}
+                        className="sr-only peer"
+                        aria-label={`${question} response ${value}`}
+                      />
+                      <span
+                        className="flex h-10 w-10 items-center justify-center rounded-full border border-asuMaroon/30 bg-white text-sm transition peer-checked:bg-gradient-to-br peer-checked:from-asuMaroon peer-checked:via-asuMaroon peer-checked:to-asuGold peer-checked:text-white peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-asuGold"
+                      >
+                        {value}
+                      </span>
+                      <span className="mt-1 text-[10px] font-normal text-gray-500">{value}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            ))}
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-full border border-asuMaroon/20 px-5 py-2 text-sm font-semibold text-asuMaroon transition hover:bg-asuMaroon/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-asuGold"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              className="rounded-full bg-gradient-to-r from-asuMaroon via-asuMaroon to-asuGold px-6 py-2 text-sm font-semibold text-white shadow-lg transition hover:brightness-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-asuGold"
+            >
+              Save pulse
+            </button>
+          </div>
         </div>
       </div>
     </div>

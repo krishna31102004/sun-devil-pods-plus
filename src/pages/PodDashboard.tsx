@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SpacePicker, { Space } from '../components/SpacePicker';
 import BelongingPulse from '../components/BelongingPulse';
 import { formatTagLabel } from '../lib/tagOptions';
 import { getRole, Role } from '../lib/roles';
 import { adjustPoints, getPoints } from '../lib/points';
+import { clampWeek, getRealWeek, persistWeek, readStoredWeek } from '../lib/weeks';
 
 type User = {
   id: string;
@@ -97,40 +98,6 @@ const getEffectiveAvailability = (space: Space, overrides: Record<string, boolea
   return typeof space.available === 'boolean' ? space.available : true;
 };
 
-const clampWeek = (value: number) => Math.min(14, Math.max(1, value));
-
-const semesterAnchor = () => {
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  return new Date(currentYear, 7, 19); // August is month 7 (zero-indexed)
-};
-
-const deriveWeekFromAnchor = () => {
-  const anchor = semesterAnchor();
-  const now = new Date();
-  const diffMs = now.getTime() - anchor.getTime();
-  const weeks = Math.floor(diffMs / (1000 * 60 * 60 * 24 * 7));
-  return clampWeek(1 + weeks);
-};
-
-const readCurrentWeek = () => {
-  if (typeof window === 'undefined') return 1;
-  const stored = localStorage.getItem('currentWeek');
-  if (stored) {
-    const parsed = parseInt(stored, 10);
-    if (!Number.isNaN(parsed)) {
-      return clampWeek(parsed);
-    }
-  }
-  const computed = deriveWeekFromAnchor();
-  try {
-    localStorage.setItem('currentWeek', computed.toString());
-  } catch (error) {
-    console.error('Unable to persist derived week', error);
-  }
-  return computed;
-};
-
 const PodDashboard: React.FC = () => {
   const navigate = useNavigate();
   const [bundle, setBundle] = useState<DataBundle>(defaultBundle);
@@ -139,7 +106,8 @@ const PodDashboard: React.FC = () => {
   const [pod, setPod] = useState<Pod | null>(null);
   const [podMembers, setPodMembers] = useState<User[]>([]);
   const [quest, setQuest] = useState<Quest | null>(null);
-  const [currentWeek, setCurrentWeek] = useState<number>(() => readCurrentWeek());
+  const [currentWeek, setCurrentWeek] = useState<number>(() => readStoredWeek());
+  const [realWeek, setRealWeek] = useState<number>(() => getRealWeek());
   const [role, setRoleState] = useState<Role>(() => (typeof window === 'undefined' ? 'student' : getRole()));
   const [currentUserId, setCurrentUserId] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
@@ -178,6 +146,77 @@ const PodDashboard: React.FC = () => {
   const [lastBelongingScore, setLastBelongingScore] = useState<number | null>(null);
   const [belongingDelta, setBelongingDelta] = useState<number | null>(null);
   const [isCheckedInThisWeek, setIsCheckedInThisWeek] = useState<boolean>(false);
+  const [vibeAverage, setVibeAverage] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const refresh = () => setRealWeek(getRealWeek());
+    refresh();
+    const interval = window.setInterval(refresh, 1000 * 60 * 60);
+    window.addEventListener('pods:week-refresh', refresh);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('pods:week-refresh', refresh);
+    };
+  }, []);
+
+  const loadVibeAverage = useCallback(() => {
+    if (typeof window === 'undefined' || !pod) {
+      setVibeAverage(null);
+      return;
+    }
+    try {
+      const direct = localStorage.getItem(`vibeRatings:${pod.id}`);
+      const aggregateRaw = direct ?? localStorage.getItem('vibeRatings');
+      if (!aggregateRaw) {
+        setVibeAverage(null);
+        return;
+      }
+      const parsed = JSON.parse(aggregateRaw);
+      const values: unknown = direct ? parsed : parsed?.[pod.id];
+      if (!Array.isArray(values)) {
+        setVibeAverage(null);
+        return;
+      }
+      const numeric = values
+        .map((entry) => Number(entry))
+        .filter((value) => Number.isFinite(value) && value > 0) as number[];
+      if (numeric.length === 0) {
+        if (pod.vibe && pod.vibe > 0) {
+          setVibeAverage(Math.round(pod.vibe * 10) / 10);
+        } else {
+          setVibeAverage(null);
+        }
+        return;
+      }
+      const average = numeric.reduce((sum, value) => sum + value, 0) / numeric.length;
+      setVibeAverage(Math.round(average * 10) / 10);
+    } catch (error) {
+      console.error('Unable to parse vibe ratings', error);
+      setVibeAverage(null);
+    }
+  }, [pod]);
+
+  useEffect(() => {
+    loadVibeAverage();
+  }, [loadVibeAverage]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleStorage = (event: StorageEvent) => {
+      if (!pod) return;
+      if (!event.key || event.key === `vibeRatings:${pod.id}` || event.key === 'vibeRatings') {
+        loadVibeAverage();
+      }
+    };
+    const handleCustom = () => loadVibeAverage();
+    window.addEventListener('storage', handleStorage);
+    window.addEventListener('pods:vibe-updated', handleCustom as EventListener);
+    return () => {
+      window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('pods:vibe-updated', handleCustom as EventListener);
+    };
+  }, [loadVibeAverage, pod]);
 
   const isCaptain = role === 'captain';
   const isCaptainCandidate = role === 'captain-candidate';
@@ -186,7 +225,7 @@ const PodDashboard: React.FC = () => {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
-      const resolvedWeek = readCurrentWeek();
+      const resolvedWeek = readStoredWeek();
       setCurrentWeek(resolvedWeek);
       const userId = localStorage.getItem('currentUserId');
       const userName = localStorage.getItem('currentUserName');
@@ -437,11 +476,7 @@ const PodDashboard: React.FC = () => {
   const updateWeek = (nextWeek: number) => {
     const safeWeek = clampWeek(nextWeek);
     setCurrentWeek(safeWeek);
-    try {
-      localStorage.setItem('currentWeek', safeWeek.toString());
-    } catch (error) {
-      console.error('Unable to persist current week', error);
-    }
+    persistWeek(safeWeek);
   };
 
   const handleCheckIn = () => {
@@ -514,6 +549,26 @@ const PodDashboard: React.FC = () => {
     (interest) => interest && interest.trim().length > 0
   );
   const dashboardTags = (signupPrefs?.tags ?? []).filter((tag) => tag && tag.trim().length > 0);
+  const viewingCurrentWeek = currentWeek === realWeek;
+  const checkInDisabled = isCheckedInThisWeek;
+  const checkInButtonLabel = isCheckedInThisWeek ? 'Checked In' : 'Check in (+10)';
+  const checkInTooltip = undefined;
+  const nextCheckInWeek = clampWeek(currentWeek + 1);
+  const checkInMessage = isCheckedInThisWeek
+    ? `Great work—next check-in unlocks on Week ${nextCheckInWeek}.`
+    : 'One check-in per week keeps your pod energized.';
+
+  const sortedBadges = useMemo(() => {
+    const unlockedIds = new Set(unlockedBadges.map((badge) => badge.id));
+    return bundle.badges
+      .slice()
+      .sort((a, b) => {
+        const aUnlocked = unlockedIds.has(a.id);
+        const bUnlocked = unlockedIds.has(b.id);
+        if (aUnlocked === bUnlocked) return a.name.localeCompare(b.name);
+        return aUnlocked ? -1 : 1;
+      });
+  }, [bundle.badges, unlockedBadges]);
 
   if (isLoadingData || !signupPrefs) {
     return <div className="p-4">Loading your pod…</div>;
@@ -544,26 +599,9 @@ const PodDashboard: React.FC = () => {
           </div>
           <div className="flex flex-wrap items-stretch gap-3">
             <div className="bg-asuMaroon text-white rounded-2xl px-5 py-3 text-center shadow">
-              <p className="text-xs uppercase tracking-wide text-white/70">Current Week</p>
-              <p className="text-2xl font-bold">{currentWeek} / 14</p>
-              {isCaptain && (
-                <div className="mt-3 flex justify-center gap-2 text-xs font-semibold">
-                  <button
-                    type="button"
-                    onClick={() => updateWeek(currentWeek - 1)}
-                    className="rounded-full border border-white/40 px-2 py-0.5 hover:bg-white/10"
-                  >
-                    −
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => updateWeek(currentWeek + 1)}
-                    className="rounded-full border border-white/40 px-2 py-0.5 hover:bg-white/10"
-                  >
-                    +
-                  </button>
-                </div>
-              )}
+              <p className="text-xs uppercase tracking-wide text-white/70">Viewing Week</p>
+              <p className="text-2xl font-bold">Week {currentWeek} / 14</p>
+              <p className="mt-2 text-xs font-semibold text-white/70">Real week: {realWeek}</p>
             </div>
             <div className="bg-asuGold text-black rounded-2xl px-5 py-3 text-center shadow">
               <p className="text-xs uppercase tracking-wide text-black/60">Captain</p>
@@ -613,41 +651,79 @@ const PodDashboard: React.FC = () => {
               </li>
             ))}
           </ul>
-          <p className="text-xs text-gray-500">
-            Vibe score averages {pod.vibe}/5. Keep the rituals going to boost connection.
-          </p>
+          {vibeAverage !== null && (
+            <p className="flex items-center gap-2 text-xs text-gray-500">
+              <span>
+                Vibe average {vibeAverage.toFixed(1)}/5. Keep the rituals going to boost connection.
+              </span>
+              <span
+                role="img"
+                aria-label="Vibe is a private pod average"
+                title="Vibe is a private pod average"
+                className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-asuMaroon/10 text-[11px] font-semibold text-asuMaroon"
+              >
+                i
+              </span>
+            </p>
+          )}
         </div>
         <div className="lg:col-span-2 bg-white/80 backdrop-blur border border-white/60 rounded-2xl shadow-xl p-6 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
                 <h2 className="text-xl font-bold text-asuMaroon">Connection Quest · Week {currentWeek}</h2>
                 <p className="text-base text-gray-700 font-semibold">{quest.title}</p>
                 <p className="text-sm text-gray-600">{quest.description}</p>
               </div>
-              <div className="flex flex-col gap-3 min-w-[200px]">
+              <div className="flex items-center gap-2 text-sm">
+                <button
+                  type="button"
+                  onClick={() => updateWeek(currentWeek - 1)}
+                  disabled={currentWeek <= 1}
+                  className="rounded-full border border-asuMaroon/30 px-4 py-2 font-semibold text-asuMaroon transition hover:bg-asuMaroon/10 disabled:cursor-not-allowed disabled:border-asuGray disabled:text-gray-400"
+                >
+                  Previous week
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateWeek(currentWeek + 1)}
+                  disabled={currentWeek >= 14}
+                  className="rounded-full border border-asuMaroon/30 px-4 py-2 font-semibold text-asuMaroon transition hover:bg-asuMaroon/10 disabled:cursor-not-allowed disabled:border-asuGray disabled:text-gray-400"
+                >
+                  Next week
+                </button>
+              </div>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-3 sm:items-start">
                 <button
                   onClick={handleCheckIn}
-                  disabled={isCheckedInThisWeek}
-                  className={`rounded-full px-4 py-2 font-semibold text-sm transition ${
-                    isCheckedInThisWeek ? 'bg-asuGray text-gray-500 cursor-not-allowed' : 'bg-asuMaroon text-white hover:bg-[#6f1833]'
+                  disabled={checkInDisabled}
+                  title={checkInTooltip}
+                  className={`rounded-full px-4 py-2 font-semibold text-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-asuGold ${
+                    checkInDisabled
+                      ? 'bg-asuGray text-gray-500 cursor-not-allowed'
+                      : 'bg-asuMaroon text-white hover:bg-[#6f1833]'
                   }`}
                 >
-                  {isCheckedInThisWeek ? 'Checked In' : 'Check in (+10)'}
+                  {checkInButtonLabel}
                 </button>
-                <p className="text-xs text-gray-500 text-center">
-                  {isCheckedInThisWeek
-                    ? `Great work—next check-in unlocks on Week ${clampWeek(currentWeek + 1)}.`
-                    : 'One check-in per week keeps your pod energized.'}
-                </p>
+                <p className="text-xs text-gray-500 text-center sm:text-left">{checkInMessage}</p>
+              </div>
+              <div className="flex flex-col gap-2 min-w-[200px]">
                 <button
                   onClick={handleCompleteQuest}
                   disabled={questCompleted}
-                className={`rounded-full px-4 py-2 font-semibold text-sm transition ${
-                  questCompleted ? 'bg-asuGray text-gray-500 cursor-not-allowed' : 'bg-asuGold text-black hover:brightness-95'
-                }`}
-              >
-                {questCompleted ? 'Quest Completed' : 'Complete Quest (+30)'}
-              </button>
+                  className={`rounded-full px-4 py-2 font-semibold text-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-asuGold/60 ${
+                    questCompleted ? 'bg-asuGray text-gray-500 cursor-not-allowed' : 'bg-asuGold text-black hover:brightness-95'
+                  }`}
+                >
+                  {questCompleted ? 'Quest Completed' : 'Complete Quest (+30)'}
+                </button>
+                <p className="text-xs text-gray-500 text-center sm:text-right">
+                  Unlock extra points by finishing together before Week {clampWeek(currentWeek + 1)}.
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -680,39 +756,45 @@ const PodDashboard: React.FC = () => {
           )}
           <div>
             <h3 className="text-sm font-semibold text-asuMaroon uppercase tracking-wide mb-3">Badges</h3>
-            <ul className="space-y-3 text-sm text-gray-700">
-              {bundle.badges
-                .slice()
-                .sort((a, b) => {
-                  const unlockedIds = unlockedBadges.map((badge) => badge.id);
-                  const aUnlocked = unlockedIds.includes(a.id);
-                  const bUnlocked = unlockedIds.includes(b.id);
-                  if (aUnlocked === bUnlocked) return a.name.localeCompare(b.name);
-                  return aUnlocked ? -1 : 1;
-                })
-                .map((badge) => {
-                  const unlocked = unlockedBadges.some((item) => item.id === badge.id);
-                  return (
-                    <li
-                      key={badge.id}
-                      className={`flex items-start gap-3 rounded-xl border px-3 py-2 ${
-                        unlocked ? 'border-asuMaroon/40 bg-asuMaroon/5' : 'border-asuGray bg-white/70'
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {sortedBadges.map((badge) => {
+                const unlocked = unlockedBadges.some((item) => item.id === badge.id);
+                return (
+                  <div
+                    key={badge.id}
+                    className={`relative flex items-start gap-3 rounded-xl border px-4 py-4 shadow-sm transition ${
+                      unlocked
+                        ? 'border-asuMaroon/40 bg-white'
+                        : 'border-asuGray/50 bg-white/80 opacity-60'
+                    }`}
+                  >
+                    <span
+                      aria-hidden
+                      className="pointer-events-none absolute inset-x-0 top-0 h-1 rounded-t-xl bg-gradient-to-r from-asuMaroon to-asuGold"
+                    />
+                    <span className={`text-2xl ${unlocked ? 'text-asuMaroon' : 'text-asuMaroon/50'}`} aria-hidden>
+                      {badge.icon || '🏅'}
+                    </span>
+                    <div className="flex-1 space-y-1">
+                      <p className={`text-sm font-semibold ${unlocked ? 'text-asuMaroon' : 'text-gray-600'}`}>{badge.name}</p>
+                      <p className="text-xs text-gray-500">{badge.criteria}</p>
+                    </div>
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${
+                        unlocked ? 'bg-asuMaroon/10 text-asuMaroon' : 'bg-gray-200 text-gray-500'
                       }`}
                     >
-                      <span className="text-2xl" aria-hidden>
-                        {badge.icon || '🏅'}
-                      </span>
-                      <div className="flex-1">
-                        <p className={`text-sm font-semibold ${unlocked ? 'text-asuMaroon' : 'text-gray-600'}`}>{badge.name}</p>
-                        <p className="text-xs text-gray-500">{badge.criteria}</p>
-                      </div>
-                      <span className={`text-[11px] font-semibold uppercase tracking-wide ${unlocked ? 'text-asuMaroon' : 'text-gray-400'}`}>
-                        {unlocked ? 'Unlocked' : 'Locked'}
-                      </span>
-                    </li>
-                  );
-                })}
-            </ul>
+                      {!unlocked && (
+                        <span aria-hidden role="img">
+                          🔒
+                        </span>
+                      )}
+                      {unlocked ? 'Unlocked' : 'Locked'}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
         <div className="bg-white/80 backdrop-blur border border-white/60 rounded-2xl shadow-xl p-6 space-y-4">

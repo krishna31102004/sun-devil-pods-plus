@@ -154,6 +154,19 @@ const Store: React.FC = () => {
         })}
       </div>
 
+      <p className="mt-4 text-sm text-neutral-600">
+        Want more rewards?{' '}
+        <a
+          href="https://sundevilrewards.asu.edu/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-medium text-indigo-600 hover:text-indigo-700 underline underline-offset-2"
+        >
+          See more here
+        </a>
+        .
+      </p>
+
       <button
         onClick={() => navigate('/dashboard')}
         className="rounded-full px-5 py-3 bg-asuMaroon text-white text-sm font-semibold shadow-lg hover:bg-[#6f1833]"

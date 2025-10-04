@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { CaptainApplication } from './CaptainApply';
-import { adjustPoints, getPoints } from '../lib/points';
+import { adjustPoints, getPoints, setPoints } from '../lib/points';
 import { Role, currentUserId as getCurrentUserId, getRole, setCurrentUserId, setRole } from '../lib/roles';
+import { clampWeek, getRealWeek, persistWeek, readStoredWeek } from '../lib/weeks';
 
 interface Pod {
   id: string;
@@ -42,36 +43,6 @@ interface Space {
 const APPLICATION_KEY = 'captainApplications';
 const ASSIGNED_CAPTAINS_KEY = 'assignedCaptains';
 const weeks = Array.from({ length: 14 }, (_, idx) => idx + 1);
-
-const clampWeek = (value: number) => Math.min(14, Math.max(1, value));
-
-const semesterAnchor = () => {
-  const now = new Date();
-  return new Date(now.getFullYear(), 7, 19);
-};
-
-const deriveWeekFromAnchor = () => {
-  const now = new Date();
-  const diff = now.getTime() - semesterAnchor().getTime();
-  const computed = 1 + Math.floor(diff / (1000 * 60 * 60 * 24 * 7));
-  return clampWeek(computed);
-};
-
-const readCurrentWeek = () => {
-  if (typeof window === 'undefined') return 1;
-  const stored = localStorage.getItem('currentWeek');
-  if (stored) {
-    const parsed = parseInt(stored, 10);
-    if (!Number.isNaN(parsed)) return clampWeek(parsed);
-  }
-  const derived = deriveWeekFromAnchor();
-  try {
-    localStorage.setItem('currentWeek', derived.toString());
-  } catch (error) {
-    console.error('Unable to persist derived week', error);
-  }
-  return derived;
-};
 
 const getEffectiveAvailability = (space: Space, overrides: Record<string, boolean>): boolean => {
   if (space.id in overrides) return overrides[space.id];
@@ -152,9 +123,11 @@ const CaptainConsole: React.FC = () => {
   const [spaceOverrides, setSpaceOverrides] = useState<Record<string, boolean>>(() => readSpaceOverrides());
   const [activeTab, setActiveTab] = useState<'members' | 'spaces' | 'quests' | 'applications'>('members');
   const [refreshToken, setRefreshToken] = useState(0);
-  const [currentWeek, setCurrentWeek] = useState<number>(readCurrentWeek());
+  const [currentWeek, setCurrentWeek] = useState<number>(readStoredWeek());
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [issuedMessage, setIssuedMessage] = useState<string | null>(null);
+  const [dismissedRecommendations, setDismissedRecommendations] = useState<boolean>(false);
+  const [vibeVersion, setVibeVersion] = useState<number>(0);
 
   useEffect(() => {
     const hydrate = async () => {
@@ -179,6 +152,17 @@ const CaptainConsole: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleVibeUpdate = () => setVibeVersion((value) => value + 1);
+    window.addEventListener('pods:vibe-updated', handleVibeUpdate);
+    window.addEventListener('storage', handleVibeUpdate);
+    return () => {
+      window.removeEventListener('pods:vibe-updated', handleVibeUpdate);
+      window.removeEventListener('storage', handleVibeUpdate);
+    };
+  }, []);
+
+  useEffect(() => {
     const syncRole = () => setRoleState(getRole());
     const syncUser = () => setCurrentId(getCurrentUserId());
     const syncApplications = () => setApplications(readApplications());
@@ -197,6 +181,8 @@ const CaptainConsole: React.FC = () => {
       window.removeEventListener('storage', syncSpaces);
     };
   }, []);
+
+  const realWeek = useMemo(() => getRealWeek(), []);
 
   const activePod = useMemo(() => {
     if (pods.length === 0) return null;
@@ -248,6 +234,163 @@ const CaptainConsole: React.FC = () => {
     });
   }, [activePod, podMembers, refreshToken]);
 
+  const vibeTrail = useMemo(() => {
+    if (typeof window === 'undefined' || !activePod) return [] as number[];
+    try {
+      const directRaw = localStorage.getItem(`vibeRatings:${activePod.id}`);
+      const aggregateRaw = directRaw ?? localStorage.getItem('vibeRatings');
+      if (!aggregateRaw) return [] as number[];
+      const parsed = JSON.parse(aggregateRaw);
+      const values = directRaw ? parsed : parsed?.[activePod.id];
+      if (!Array.isArray(values)) return [] as number[];
+      return values.map((value: unknown) => {
+        const asNumber = Number(value);
+        return Number.isFinite(asNumber) ? asNumber : 0;
+      });
+    } catch (error) {
+      console.error('Unable to read vibe ratings for recommendations', error);
+      return [] as number[];
+    }
+  }, [activePod, vibeVersion]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!activePod || podMembers.length === 0) return;
+    const seedKey = `progressSeeded:${activePod.id}`;
+    if (localStorage.getItem(seedKey)) return;
+
+    podMembers.forEach((member, memberIndex) => {
+      let calculatedPoints = 0;
+      weeks.forEach((week) => {
+        const withinSeason = week <= realWeek;
+        const checkinKey = `checkin:${activePod.id}:${week}:${member.id}`;
+        const questKey = `quest:${activePod.id}:${week}:${member.id}`;
+        if (!localStorage.getItem(checkinKey) && withinSeason) {
+          const assigned = memberIndex === 0 && (week === 7 || week === 8) ? false : (memberIndex + week) % 3 !== 0;
+          if (assigned) {
+            localStorage.setItem(checkinKey, '1');
+            calculatedPoints += 10;
+          }
+        } else if (localStorage.getItem(checkinKey)) {
+          calculatedPoints += 10;
+        }
+
+        if (!localStorage.getItem(questKey) && withinSeason) {
+          const lockedMember = memberIndex === podMembers.length - 1;
+          const assigned = !lockedMember && ((memberIndex + week) % 5 === 0 || (memberIndex % 2 === 0 && week % 4 === 0));
+          if (assigned) {
+            localStorage.setItem(questKey, '1');
+            calculatedPoints += 30;
+          }
+        } else if (localStorage.getItem(questKey)) {
+          calculatedPoints += 30;
+        }
+      });
+
+      const currentPoints = getPoints(member.id);
+      if (calculatedPoints > currentPoints) {
+        setPoints(member.id, calculatedPoints);
+      }
+    });
+
+    if (!localStorage.getItem(`vibeRatings:${activePod.id}`)) {
+      const vibeTrail = weeks.map((week) => {
+        if (week > realWeek) return 0;
+        const base = 3.6 + Math.sin((week / 3) + activePod.id.length) * 0.4;
+        const adjustment = week >= realWeek - 1 ? -0.7 : week >= realWeek - 2 ? -0.4 : 0;
+        const value = Math.max(2.4, Math.min(4.8, base + adjustment));
+        return Number(value.toFixed(1));
+      });
+      localStorage.setItem(`vibeRatings:${activePod.id}`, JSON.stringify(vibeTrail));
+      window.dispatchEvent(new Event('pods:vibe-updated'));
+    }
+
+    localStorage.setItem(seedKey, new Date().toISOString());
+    window.dispatchEvent(new Event('pods:points-updated'));
+  }, [activePod, podMembers, realWeek]);
+
+  const focusRecommendations = useMemo(() => {
+    if (!activePod) return [] as { memberId: string; message: string }[];
+    const candidates: { memberId: string; message: string; priority: number }[] = [];
+    const relevantWeeks = weeks.filter((week) => week <= realWeek);
+    if (relevantWeeks.length === 0) return [];
+
+    memberRows.forEach((row) => {
+      let streakStart: number | null = null;
+      let streakEnd: number | null = null;
+      let flaggedStreak: { start: number; end: number } | null = null;
+      relevantWeeks.forEach((week) => {
+        if (!row.checkins[week]) {
+          if (streakStart === null) streakStart = week;
+          streakEnd = week;
+        } else if (streakStart !== null) {
+          const length = (streakEnd ?? week) - streakStart + 1;
+          if (length >= 2 && !flaggedStreak) {
+            flaggedStreak = { start: streakStart, end: streakEnd ?? week };
+          }
+          streakStart = null;
+          streakEnd = null;
+        }
+      });
+      if (streakStart !== null) {
+        const length = (streakEnd ?? relevantWeeks[relevantWeeks.length - 1]) - streakStart + 1;
+        if (length >= 2 && !flaggedStreak) {
+          flaggedStreak = { start: streakStart, end: streakEnd ?? relevantWeeks[relevantWeeks.length - 1] };
+        }
+      }
+      if (flaggedStreak) {
+        candidates.push({
+          memberId: row.user.id,
+          message: `Reach out to ${row.user.name} (missed W${flaggedStreak.start}–W${flaggedStreak.end}). Try a quiet-space option this week.`,
+          priority: 1,
+        });
+      }
+
+      const hasQuestCompletion = relevantWeeks.some((week) => row.quests[week]);
+      if (!hasQuestCompletion && relevantWeeks.length > 0) {
+        candidates.push({
+          memberId: row.user.id,
+          message: `Plan a co-working quest with ${row.user.name} to spark their first completion.`,
+          priority: 2,
+        });
+      }
+    });
+
+    const latestIndex = Math.min(realWeek, vibeTrail.length) - 1;
+    if (latestIndex >= 1) {
+      const latest = vibeTrail[latestIndex];
+      const previous = vibeTrail[latestIndex - 1];
+      if (latest > 0 && previous > 0 && latest < 3 && previous < 3 && latest <= previous) {
+        const attendanceLeaders = memberRows
+          .map((row) => {
+            const attended = relevantWeeks.reduce((sum, week) => (row.checkins[week] ? sum + 1 : sum), 0);
+            const rate = attended / relevantWeeks.length;
+            return { row, rate };
+          })
+          .sort((a, b) => b.rate - a.rate);
+        const anchor = attendanceLeaders[0]?.row;
+        if (anchor) {
+          candidates.push({
+            memberId: anchor.user.id,
+            message: `Pod vibe dipped below 3 the last two weeks. Pair ${anchor.user.name} to co-host a restorative meetup.`,
+            priority: 3,
+          });
+        }
+      }
+    }
+
+    const seen = new Set<string>();
+    return candidates
+      .sort((a, b) => a.priority - b.priority)
+      .reduce<{ memberId: string; message: string }[]>((acc, candidate) => {
+        if (acc.length >= 3) return acc;
+        if (seen.has(candidate.memberId)) return acc;
+        seen.add(candidate.memberId);
+        acc.push({ memberId: candidate.memberId, message: candidate.message });
+        return acc;
+      }, []);
+  }, [activePod, memberRows, realWeek, vibeTrail]);
+
   const handleToggleProgress = (memberId: string, week: number, type: 'checkin' | 'quest') => {
     if (!activePod) return;
     const key = `${type}:${activePod.id}:${week}:${memberId}`;
@@ -265,11 +408,7 @@ const CaptainConsole: React.FC = () => {
   const updateSharedWeek = (value: number) => {
     const safe = clampWeek(value);
     setCurrentWeek(safe);
-    try {
-      localStorage.setItem('currentWeek', safe.toString());
-    } catch (error) {
-      console.error('Unable to persist current week from console', error);
-    }
+    persistWeek(safe);
   };
 
   const toggleSpaceAvailability = (spaceId: string) => {
@@ -506,6 +645,37 @@ const CaptainConsole: React.FC = () => {
               </tbody>
             </table>
           </div>
+          {focusRecommendations.length > 0 && !dismissedRecommendations && (
+            <div className="mt-5 space-y-3 rounded-2xl border border-asuMaroon/20 bg-white/80 p-5 shadow-inner">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold text-asuMaroon">Focus recommendations</h3>
+                  <p className="text-xs text-gray-600">Signals from attendance, quests, and vibe trends.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDismissedRecommendations(true)}
+                  className="rounded-full border border-transparent px-3 py-1 text-xs font-semibold text-asuMaroon hover:border-asuMaroon/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-asuGold"
+                  aria-label="Dismiss recommendations"
+                >
+                  Dismiss
+                </button>
+              </div>
+              <ul className="space-y-2 text-sm text-gray-700">
+                {focusRecommendations.map((recommendation) => (
+                  <li
+                    key={recommendation.memberId}
+                    className="flex items-start gap-3 rounded-xl border border-asuMaroon/10 bg-white px-3 py-2 shadow-sm"
+                  >
+                    <span className="mt-1 text-asuMaroon" aria-hidden>
+                      •
+                    </span>
+                    <span>{recommendation.message}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </section>
       )}
 
