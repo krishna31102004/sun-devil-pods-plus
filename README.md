@@ -1,62 +1,161 @@
-# SunDevil Pods+ Prototype
+# SunDevil Pods+
+Barrier-aware micro-communities (pods of 5–8) matched by zone + 45-min window + interests, guided by a peer captain and a semester-long Connection Quests game.
 
-This starter project provides a skeleton for building the SunDevil Pods+ hackathon prototype.
+[Live demo](https://sun-devil-pods-plus.vercel.app)
 
-## Project Structure
+## Table of Contents
+- [Demo Screens](#demo-screens)
+- [Key Features](#key-features)
+- [Architecture](#architecture)
+- [Getting Started](#getting-started)
+  - [Prerequisites](#prerequisites)
+  - [Install](#install)
+  - [Run (dev)](#run-dev)
+  - [Build & Preview](#build--preview)
+- [Data Seeds & Matching](#data-seeds--matching)
+- [App Walkthrough](#app-walkthrough)
+- [Configuration](#configuration)
+- [Accessibility Notes](#accessibility-notes)
+- [Deploy to Vercel](#deploy-to-vercel)
+- [Project Structure](#project-structure)
+- [Testing](#testing)
+- [Known Limitations](#known-limitations)
+- [Roadmap](#roadmap)
+- [Credits](#credits)
+- [License](#license)
 
-- `public/data/` — Contains sample data files used by the prototype. You can edit these to test matching and UI.
-  - `students.csv` — Seed signup data with 24 students across four campuses. Each record includes name, email, zone, two interests, two available 45‑minute time slots and optional identity tags (e.g. `commuter`, `international`, `first_gen`, `sensory`, `mobility`, `language_ally`).
-  - `spaces.json` — List of sticky meeting locations with ADA and sensory-friendly flags and capacities. These correspond to the “Third Places” identified in the spec (e.g. MU lounges, Hayden booths).
-  - `quests.json` — Four-week Connection Quests curriculum with point values and badge IDs.
-  - `badges.json` — Definitions for badges unlocked by quests.
-  - `interests.json` — Canonical list of 17 interest tags that students choose from during sign‑up (e.g. `study sprint`, `soccer`, `art`, `coding`).
-- `scripts/` — Custom scripts.
-  - `match.ts` — Reads `students.csv` and produces `pods.json` grouping students into pods of 5–8 by zone, time, interests and tags.
-- `src/` — Source code for the web app (React + Tailwind skeleton). You can expand these components to implement the full UI.
-  - `components/` — Reusable UI components (empty placeholders).
-  - `pages/` — Top-level pages (signup, match result, pod dashboard).
-  - `lib/` — Utility functions (points engine, quest helpers, etc.).
-- `docs/` — Documentation and assets.
-  - `captain-toolkit.md` — Outline of weekly run‑of‑show for peer captains.
-  - `space-map.md` — List of sticky campus spaces.
-  - `slides-outline.md` — Suggested slide order mapped to hackathon rubrics.
+## Demo Screens
+![Home](docs/screenshots/home.png)
+![Sign Up](docs/screenshots/signup.png)
+![Student Dashboard](docs/screenshots/dashboard-student.png)
+![Captain Console](docs/screenshots/captain-console.png)
+![Store](docs/screenshots/store.png)
+![Belonging Pulse](docs/screenshots/pulse.png)
+
+## Key Features
+- 90-second signup covering interests, availability windows, zones, and optional identity tags
+- Automated pod matching (5–8 people) respecting barrier-aware constraints from the matcher
+- Semester-long Connection Quests with 14-week arc and once-per-week check-in tracking
+- Pod points, badge unlocks, and a mock rewards store that links to Sun Devil Rewards for more perks
+- Meeting space selector with ADA and sensory flags; captains control availability overrides
+- Role-aware dashboard that flips between student and captain experiences via stored role state
+- Captain Console with attendance + quest grid (W1–W14), vibe average, and quest issuing controls
+- Belonging Pulse three-question Likert survey with delta visual and local history
+- Accessibility-minded UI with high contrast combos, keyboard-first interactions, and reduce-motion option
+
+## Architecture
+- Client: React 18 + Vite + TypeScript backed by Tailwind CSS (see `tailwind.config.js` for ASU palette tokens)
+- Data: static JSON under `public/data` (users, pods, spaces, quests, badges, rewards, interests) hydrated at runtime; session state persisted via localStorage
+- Matching: `scripts/match.ts` (compiled to `scripts/match.js`) converts CSV signups into `public/data/pods.json`
+- Build & tooling: Vite scripts (`dev`, `build`, `preview`) and auxiliary `build:scripts` TypeScript compile for Node utilities
+- Deploy: static export hosted on Vercel (`sun-devil-pods-plus.vercel.app`)
 
 ## Getting Started
 
-1. **Install dependencies (optional)** — If you plan to run the UI or TypeScript scripts, install dependencies:
+### Prerequisites
+- Node 18+ (align with Vercel default runtime)
+- npm (project ships with `package-lock.json`)
 
-   ```sh
-   npm install
-   ```
+### Install
+```bash
+npm install
+```
 
-2. **Generate pods** — Run the matching script to create `pods.json` from your signup data:
+### Run (dev)
+```bash
+npm run dev
+# Vite serves at http://localhost:5173 by default
+```
 
-   ```sh
-   npx ts-node scripts/match.ts
-   ```
+### Build & Preview
+```bash
+npm run build
+npm run preview
+# Serves the production build from dist/ on http://localhost:4173
+```
 
-   This will output a new `pods.json` in `public/data/`.
+## Data Seeds & Matching
+- JSON seeds live in `public/data/users.json`, `spaces.json`, `quests.json`, `badges.json`, `rewards.json`, `interests.json`, and `pods.json`
+- Update these files directly for demo tweaks; localStorage augments them per visitor session
+- Generate pods from CSV:
 
-3. **Run the app (optional)** — If you’ve built the React app, start a dev server:
+```bash
+# CSV columns: name,email,zone,interests,times,tags (see public/data/students.csv for a sample)
+npm run match
+# Outputs refreshed public/data/pods.json
+```
 
-   ```sh
-   npm run dev
-   ```
+- The TypeScript source (`scripts/match.ts`) may be edited and recompiled via `npm run build:scripts` if needed
 
-   Open `http://localhost:3000` in your browser to view the prototype.
+## App Walkthrough
+1. **Home:** choose *Join Pods* or *Become a Peer Captain*; sponsor logos live as placeholders in `/public/partners/*`.
+2. **Sign Up:** capture interests, 45-minute windows, campus zone, and optional lived-experience tags that influence matching.
+3. **Student Dashboard:** see roster, weekly Connection Quest, single-use weekly check-in, pod points & badges grid, meeting space controls (captain-only edits), Belonging Pulse modal, and Pod Rewards Store.
+4. **Captain Application:** upload resume (PDF), select campuses and availability, pledge to program expectations, and review incentive card for Letter of Recommendation + Completion Certificate.
+5. **Captain Console:** monitor attendance & quest grid (W1–W14), vibe trend average, issue quests, manage space availability, and view outreach recommendations.
 
-## Notes
+## Configuration
+- Environment variables: none required for the local demo (all data is static or stored in-browser)
+- Feature flags: not implemented; behavior toggles rely on role stored in localStorage (`role`, `currentUserId`, etc.)
+- Styling: Tailwind theme extends ASU-inspired maroon/gold gradients (`tailwind.config.js` + `postcss.config.js`)
 
-**UI Features.** In this iteration the starter kit has grown beyond data models and matching. After signing up with your interests, time slots, campus zone and optional identity tags, the app matches you to a pod. On the dashboard you can:
+## Accessibility Notes
+- All primary interactions are keyboard accessible with focus rings and ARIA labels where needed
+- Reduce motion preference respected via Tailwind utility variants
+- Meeting spaces include sensory-friendly and ADA tags to guide inclusive selections
 
-  * View **Pod Details** (zone, meeting time, captain, members and a private vibe score).
-  * See the current **Connection Quest** and record **Check‑in** and **Quest completion** points.
-  * Track **Points & Badges** earned during the four‑week cycle.
-  * Choose a **Meeting Space** via the space picker modal; spaces are filtered by your campus zone and display ADA and sensory labels.
-  * Record your **Belonging Pulse** by answering three short survey questions. The app stores your pulse scores in localStorage and shows the change from your previous entry.
+## Deploy to Vercel
+- Build Command: `npm run build`
+- Output Directory: `dist`
+- Install Command: `npm install`
+- Framework preset: Vite (auto-detected)
 
-These components provide a taste of the full SunDevil Pods+ experience. Future iterations could include confetti animations, a rewards store for redeeming points, and a peer‑captain console.
-- The matching script uses a greedy, **barrier-aware** clustering algorithm. It groups users by campus zone, prioritises midday time slots for commuters, matches students with overlapping 45‑minute windows and at least one shared interest, and attempts to pair international students with at least one language ally. Pods are sized between 5 and 8, with +1 over‑assignment to handle no‑shows.
-- Badges and quests reflect the Connection Quests curriculum described in the hackathon spec.
+Using Vercel CLI:
+```bash
+npm i -g vercel
+vercel
+vercel --prod
+```
 
-Have fun building the SunDevil Pods+ prototype!
+## Project Structure
+```
+├─ docs/
+│  ├─ screenshots/              # image placeholders referenced in README
+│  └─ *.md                      # pitch, demo notes, captain toolkit
+├─ public/
+│  ├─ data/                     # users.json, pods.json, spaces.json, quests.json, badges.json, rewards.json, interests.json
+│  └─ partners/                 # sponsor logo placeholders (png)
+├─ scripts/
+│  ├─ match.ts                  # CSV ➜ pods.json generator (TypeScript)
+│  └─ match.js                  # compiled matcher invoked by npm run match
+├─ src/
+│  ├─ components/               # BelongingPulse modal, SpacePicker controls
+│  ├─ lib/                      # points, roles, week helpers, storage utilities
+│  ├─ pages/                    # Home, SignUp, PodDashboard, CaptainApply, CaptainConsole, Store, ApplySuccess
+│  ├─ App.tsx                   # route shell
+│  └─ main.tsx                  # Vite entry
+├─ tailwind.config.js           # Tailwind theme tokens for ASU palette
+├─ vite.config.ts               # Vite project configuration
+└─ package.json                 # scripts (dev/build/preview/match/build:scripts)
+```
+
+## Testing
+- Not yet added (manual QA via Vite dev server and build checks)
+
+## Known Limitations
+- Demo relies on local JSON files and browser storage; data resets per device
+- No authentication or real ASU identity integration
+- Weekly gating depends on client clock heuristics
+
+## Roadmap
+- Integrate Supabase/Postgres backend with ASU SSO
+- Build analytics + export pipeline to Sun Devil Rewards
+- Sync with real room availability feeds
+- Polish mobile experience and ship as a PWA
+
+## Credits
+- Team AVN K: Nysa Jain, Vaishnavi Mahajan, Krishna Balaji, Asmi Kachare
+- Student Success Center coaches and student feedback from ideation sessions
+
+## License
+- MIT (add a LICENSE file before wider distribution)
