@@ -14,6 +14,21 @@ const Home: React.FC = () => (
       </div>
     </section>
 
+    <section className="rounded-3xl border border-white/60 bg-white/80 px-6 py-4 shadow-xl backdrop-blur">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm font-medium text-asuMaroon">
+          Peer Captains earn a Letter of Recommendation and a Completion Certificate.
+        </p>
+        <Link
+          to="/apply"
+          className="inline-flex items-center gap-2 text-sm font-semibold text-asuMaroon hover:underline"
+        >
+          Learn about the captain path
+          <span aria-hidden>→</span>
+        </Link>
+      </div>
+    </section>
+
     <section
       aria-labelledby="supported-by"
       className="rounded-3xl border border-white/60 bg-white/80 px-6 py-4 shadow-xl backdrop-blur"

@@ -163,6 +163,32 @@ const CaptainApply: React.FC = () => {
           </p>
         </header>
 
+        <div className="mt-6 rounded-2xl border border-asuMaroon/20 bg-white/80 p-5 shadow-lg">
+          <div className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-asuMaroon via-asuMaroon to-asuGold px-4 py-1 text-xs font-semibold uppercase tracking-wide text-white">
+            What you earn as a Peer Captain
+          </div>
+          <ul className="mt-4 space-y-3 text-sm text-gray-700">
+            <li className="flex items-start gap-2">
+              <span className="mt-1 text-asuMaroon" aria-hidden>
+                ●
+              </span>
+              <div>
+                <p className="font-semibold text-asuMaroon">Letter of Recommendation</p>
+                <p className="text-xs text-gray-500">Awarded by program sponsors at the end of the semester.</p>
+              </div>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="mt-1 text-asuMaroon" aria-hidden>
+                ●
+              </span>
+              <div>
+                <p className="font-semibold text-asuMaroon">Completion Certificate</p>
+                <p className="text-xs text-gray-500">A verifiable digital credential you can share.</p>
+              </div>
+            </li>
+          </ul>
+        </div>
+
         <div className="mt-6 grid gap-6 md:grid-cols-2">
           <label className="flex flex-col gap-2 text-sm">
             <span className="font-semibold text-asuMaroon">Full name</span>

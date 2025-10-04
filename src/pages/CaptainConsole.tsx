@@ -513,28 +513,37 @@ const CaptainConsole: React.FC = () => {
   return (
     <div className="space-y-6">
       <header className="bg-white/80 backdrop-blur border border-white/60 rounded-2xl shadow-xl p-6 sm:p-8 space-y-3">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h1 className="text-3xl font-extrabold text-asuMaroon">Captain Console</h1>
             <p className="text-sm text-gray-600">
               {activePod.zone} Pod · {activePod.timeslot} · {activePod.memberIds.length} members
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => navigate('/dashboard')}
-              className="rounded-full px-4 py-2 bg-asuMaroon text-white text-sm font-semibold hover:bg-[#6f1833]"
-            >
-              View Pod
-            </button>
-            <button
-              type="button"
-              onClick={handleIssueQuest}
-              className="rounded-full px-4 py-2 bg-asuGold text-black text-sm font-semibold hover:brightness-95"
-            >
-              Issue Quest for Week {currentWeek}
-            </button>
+          <div className="flex flex-col items-stretch gap-3 lg:w-[18rem]">
+            <div className="rounded-2xl border border-asuGray/30 bg-white/70 px-4 py-3 text-xs text-gray-600 shadow-inner">
+              <p className="font-semibold text-asuMaroon">Stay the course</p>
+              <p className="mt-1 text-[11px] leading-relaxed">
+                Captains who complete the semester successfully will receive a Letter of Recommendation and a Completion
+                Certificate.
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => navigate('/dashboard')}
+                className="rounded-full px-4 py-2 bg-asuMaroon text-white text-sm font-semibold hover:bg-[#6f1833]"
+              >
+                View Pod
+              </button>
+              <button
+                type="button"
+                onClick={handleIssueQuest}
+                className="rounded-full px-4 py-2 bg-asuGold text-black text-sm font-semibold hover:brightness-95"
+              >
+                Issue Quest for Week {currentWeek}
+              </button>
+            </div>
           </div>
         </div>
         {role === 'captain-candidate' && (
